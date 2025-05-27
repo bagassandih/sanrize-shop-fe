@@ -1,6 +1,6 @@
 
 import GameSelectionClient from '@/app/(components)/GameSelectionClient';
-import type { Game } from '@/lib/data'; 
+import type { Game, AccountIdField } from '@/lib/data'; 
 
 interface ApiCategoryItem {
   id: number; 
@@ -22,8 +22,9 @@ async function getGames(): Promise<Game[]> {
   }
 
   try {
+    // Menggunakan cache: 'no-store' untuk selalu mengambil data terbaru
     const res = await fetch(`${apiUrl}/category`, { 
-      next: { revalidate: 3600 } 
+      cache: 'no-store' 
     });
 
     if (!res.ok) {
@@ -35,6 +36,7 @@ async function getGames(): Promise<Game[]> {
 
     const apiResponse = await res.json();
     
+    // Menyesuaikan dengan kemungkinan struktur {data: [...]} atau langsung [...]
     const categories: ApiCategoryItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
 
     if (!Array.isArray(categories)) {
@@ -57,7 +59,7 @@ async function getGames(): Promise<Game[]> {
           dataAiHint: hintKeywords, 
           description: `Top up untuk ${apiItem.name}. Pilih paket terbaikmu!`,
           packages: [], 
-          accountIdFields: [], // Akan ditentukan di halaman detail game untuk saat ini
+          accountIdFields: [], // Akan diisi di halaman detail game
         };
       });
   } catch (error) {
