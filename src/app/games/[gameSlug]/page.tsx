@@ -1,5 +1,5 @@
 
-import { getGameBySlug, parseDiamondsFromName, type Game, type DiamondPackage } from '@/lib/data';
+import { parseDiamondsFromName, type Game, type DiamondPackage, type AccountIdField } from '@/lib/data';
 import DiamondPackagesClient from '@/app/(components)/DiamondPackagesClient';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -26,6 +26,8 @@ interface ApiCategoryItem {
   img_banner: string;
   img_proof: string;
   status: string; 
+  // Ideally, API would provide accountIdFields here
+  // accountIdFields?: AccountIdField[]; 
 }
 
 async function getPackagesForGame(categoryId: number, gameSlug: string): Promise<DiamondPackage[]> {
@@ -63,19 +65,40 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
     return serviceItems
       .filter(item => item.status === 'available')
       .map((item): DiamondPackage => ({
-        id: `${gameSlug}_${item.id}`,
+        id: `${gameSlug}_${item.id}`, // Ensure unique package ID based on game and service item
         name: item.name,
         diamonds: parseDiamondsFromName(item.name),
         price: item.price,
-        bonus: item.bonus && String(item.bonus).trim() !== "" ? String(item.bonus) : undefined,
-        imageUrl: item.img || undefined, // Pastikan imageUrl adalah string atau undefined
-        iconName: !item.img ? 'Gem' : undefined, // Default ke Gem jika tidak ada imageUrl
+        bonus: item.bonus && String(item.bonus).trim() !== "" && String(item.bonus).toLowerCase() !== "0" && String(item.bonus).toLowerCase() !== "null" ? String(item.bonus) : undefined,
+        imageUrl: item.img && item.img.trim() !== "" ? item.img : undefined,
+        iconName: (!item.img || item.img.trim() === "") ? 'Gem' : undefined,
       }));
   } catch (error) {
     console.error(`Error fetching packages for category ${categoryId}:`, error);
     return [];
   }
 }
+
+// Helper function to get account ID fields based on game slug (temporary solution)
+const getAccountIdFieldsBySlug = (slug: string): AccountIdField[] => {
+  const lowerSlug = slug.toLowerCase();
+  if (lowerSlug === 'mobile-legends') {
+    return [
+      { label: "ID Pengguna", name: "userId", placeholder: "Masukkan ID Pengguna", type: "text" },
+      { label: "ID Zona", name: "zoneId", placeholder: "Masukkan ID Zona (cth: 1234)", type: "text" },
+    ];
+  }
+  if (lowerSlug === 'free-fire') {
+    return [{ label: "ID Pemain (UID)", name: "uid", placeholder: "Masukkan ID Pemain", type: "text" }];
+  }
+  if (lowerSlug === 'valorant') {
+     return [{ label: "Riot ID", name: "riotId", placeholder: "Masukkan Riot ID (Nama#Tag)", type: "text" }];
+  }
+  // Add other games here as needed
+  // console.warn(`accountIdFields not defined for slug: ${slug}. Users may not be able to input account details.`);
+  return []; // Default to no fields if slug doesn't match
+};
+
 
 type Props = {
   params: { gameSlug: string };
@@ -84,7 +107,7 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const apiUrl = process.env.BASE_API_URL;
   const lowerCaseGameSlug = params.gameSlug.toLowerCase();
-  let gameName = lowerCaseGameSlug.replace(/-/g, ' ');
+  let gameName = lowerCaseGameSlug.replace(/-/g, ' '); // Default name from slug
 
   if (apiUrl) {
     try {
@@ -98,12 +121,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         }
       }
     } catch (error) {
-      console.warn(`Could not fetch category details for metadata for slug ${lowerCaseGameSlug}:`, error);
-    }
-  } else {
-    const staticGameData = getGameBySlug(lowerCaseGameSlug);
-    if (staticGameData) {
-      gameName = staticGameData.name;
+      console.warn(`Tidak dapat mengambil detail kategori untuk metadata slug ${lowerCaseGameSlug}:`, error);
     }
   }
   
@@ -114,20 +132,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function GamePackagesPage({ params }: Props) {
-  const gameSlug = params.gameSlug.toLowerCase(); // Normalisasi slug ke huruf kecil
+  const gameSlug = params.gameSlug.toLowerCase();
   const apiUrl = process.env.BASE_API_URL;
   
-  const staticGameData = getGameBySlug(gameSlug);
-
-  if (!staticGameData) {
-    console.error(`Static game data not found for slug: ${gameSlug}`);
-    notFound();
-  }
-
-  let dynamicGameName = staticGameData.name;
-  let dynamicGameImageUrl = staticGameData.imageUrl;
-  let dynamicGameDescription = staticGameData.description;
-  let actualCategoryId = staticGameData.categoryId;
+  let gameFromApi: ApiCategoryItem | undefined;
 
   if (apiUrl) {
     try {
@@ -135,36 +143,42 @@ export default async function GamePackagesPage({ params }: Props) {
       if (res.ok) {
         const apiResponse = await res.json();
         const categories: ApiCategoryItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
-        const currentGameApiData = categories.find(cat => cat.code.toLowerCase() === gameSlug && cat.status === 'active');
-
-        if (currentGameApiData) {
-          dynamicGameName = currentGameApiData.name;
-          dynamicGameImageUrl = currentGameApiData.img_logo;
-          dynamicGameDescription = `Top up untuk ${currentGameApiData.name}. Pilih paket terbaikmu!`;
-          actualCategoryId = currentGameApiData.id;
-        } else {
-          console.warn(`Game dengan slug ${gameSlug} tidak ditemukan atau tidak aktif di API /category. Menggunakan data statis.`);
-        }
+        gameFromApi = categories.find(cat => cat.code.toLowerCase() === gameSlug && cat.status === 'active');
       } else {
-        console.error(`Gagal mengambil data kategori untuk ${gameSlug}: ${res.status}. Menggunakan data statis.`);
+        console.error(`Gagal mengambil data kategori dari API: ${res.status}. Slug: ${gameSlug}`);
       }
     } catch (error) {
-      console.error(`Error mengambil data kategori untuk ${gameSlug}:`, error, `. Menggunakan data statis.`);
+      console.error(`Error mengambil data kategori dari API untuk slug ${gameSlug}:`, error);
     }
   }
 
-  const dynamicPackages = await getPackagesForGame(actualCategoryId, gameSlug);
+  if (!gameFromApi) {
+    console.error(`Game dengan slug '${gameSlug}' tidak ditemukan di API atau API tidak dapat dijangkau.`);
+    notFound();
+  }
+
+  const accountIdFields = getAccountIdFieldsBySlug(gameSlug);
+  // if (accountIdFields.length === 0 && gameFromApi) {
+  //   // This is a good place to log if a game active in API is missing its accountIdFields definition
+  //   console.warn(`Peringatan: accountIdFields tidak terdefinisi secara lokal untuk game aktif dari API: ${gameFromApi.name} (slug: ${gameSlug}). Formulir input akun mungkin tidak muncul.`);
+  // }
+
+
+  const dynamicPackages = await getPackagesForGame(gameFromApi.id, gameSlug);
+
+  const nameParts = gameFromApi.name.toLowerCase().split(/\s+/);
+  const hintKeywords = nameParts.slice(0, 2).join(' ');
 
   const gameForClient: Game = {
-    ...staticGameData,
-    id: gameSlug,
-    categoryId: actualCategoryId,
-    name: dynamicGameName, 
-    slug: gameSlug, 
-    imageUrl: dynamicGameImageUrl, 
-    description: dynamicGameDescription,
+    id: gameFromApi.code,
+    categoryId: gameFromApi.id,
+    name: gameFromApi.name, 
+    slug: gameFromApi.code, 
+    imageUrl: gameFromApi.img_logo, 
+    description: `Top up untuk ${gameFromApi.name}. Pilih paket terbaikmu!`, // Dynamic description
     packages: dynamicPackages,
-    dataAiHint: dynamicGameName.toLowerCase().split(/\s+/).slice(0, 2).join(' '),
+    accountIdFields: accountIdFields, // From local helper
+    dataAiHint: hintKeywords,
   };
 
   return (
