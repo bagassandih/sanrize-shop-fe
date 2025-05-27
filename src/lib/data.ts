@@ -1,15 +1,14 @@
 
 import type { LucideIcon } from 'lucide-react';
-// Gem icon tidak lagi diimpor langsung di sini karena akan ditangani di komponen klien
-// import { Gem } from 'lucide-react';
 
 export interface DiamondPackage {
-  id: string;
-  name: string;
-  diamonds: number;
-  price: number; // Harga sekarang dalam IDR
-  bonus?: string;
-  iconName?: 'Gem';
+  id: string; // ID unik paket, bisa dari API
+  name: string; // Nama paket, misal "50 Diamonds"
+  diamonds?: number; // Jumlah diamond, opsional jika sudah ada di nama
+  price: number; // Harga dalam IDR
+  bonus?: string; // Bonus jika ada, misal "+5 Bonus" atau "5 + 0"
+  iconName?: 'Gem'; // Untuk fallback jika tidak ada imageUrl
+  imageUrl?: string; // URL gambar spesifik paket
 }
 
 export interface AccountIdField {
@@ -19,64 +18,61 @@ export interface AccountIdField {
   type?: string;
 }
 export interface Game {
-  id: string;
+  id: string; // Slug atau kode unik game, misal "mobile-legends"
+  categoryId: number; // ID numerik dari API /category, misal 1001
   name: string;
   slug: string;
-  imageUrl: string;
+  imageUrl: string; // URL logo game
   dataAiHint: string;
   description: string;
-  packages: DiamondPackage[];
+  packages: DiamondPackage[]; // Akan diisi dinamis dari API /service
   accountIdFields: AccountIdField[];
 }
 
-const convertPriceToIDR = (usdPrice: number): number => {
-  // Kurs perkiraan 1 USD = 15000 IDR
-  // Pembulatan sederhana untuk harga yang lebih rapi
-  if (usdPrice === 0.99) return 15000;
-  if (usdPrice === 1.99) return 30000;
-  if (usdPrice === 4.99) return 75000;
-  if (usdPrice === 9.99) return 150000;
-  return Math.round(usdPrice * 15000 / 1000) * 1000; // Bulatkan ke ribuan terdekat
-};
-
+// Data statis ini bisa berfungsi sebagai fallback atau untuk field yang tidak ada di API (seperti accountIdFields)
 export const gamesData: Game[] = [
   {
-    id: "ml",
+    id: "mobile-legends", // cocok dengan 'code' dari API /category
+    categoryId: 1001, // 'id' numerik dari API /category
     name: "Mobile Legends",
     slug: "mobile-legends",
-    imageUrl: "https://placehold.co/600x400.png",
+    imageUrl: "https://placehold.co/600x400.png", // Ini bisa di-override oleh img_logo dari API
     dataAiHint: "fantasy battle",
     description: "Top up Diamond Mobile Legends dalam hitungan detik!",
     accountIdFields: [
       { label: "ID Pengguna", name: "userId", placeholder: "Masukkan ID Pengguna", type: "text" },
       { label: "ID Zona", name: "zoneId", placeholder: "Masukkan ID Zona (cth: 1234)", type: "text" },
     ],
-    packages: [
-      { id: "ml_pkg1", name: "50 Diamonds", diamonds: 50, price: convertPriceToIDR(0.99), bonus: "+5 Bonus", iconName: "Gem" },
-      { id: "ml_pkg2", name: "100 Diamonds", diamonds: 100, price: convertPriceToIDR(1.99), bonus: "+10 Bonus", iconName: "Gem" },
-      { id: "ml_pkg3", name: "250 Diamonds", diamonds: 250, price: convertPriceToIDR(4.99), bonus: "+25 Bonus", iconName: "Gem" },
-      { id: "ml_pkg4", name: "500 Diamonds", diamonds: 500, price: convertPriceToIDR(9.99), bonus: "+65 Bonus", iconName: "Gem" },
-    ],
+    packages: [], // Akan diisi oleh API
   },
   {
-    id: "ff",
+    id: "free-fire", // cocok dengan 'code' dari API /category
+    categoryId: 1002, // 'id' numerik dari API /category (asumsi untuk Free Fire)
     name: "Free Fire",
     slug: "free-fire",
-    imageUrl: "https://placehold.co/600x400.png",
+    imageUrl: "https://placehold.co/600x400.png", // Ini bisa di-override oleh img_logo dari API
     dataAiHint: "action shooter",
     description: "Dapatkan Diamond Free Fire Anda dengan cepat dan mudah!",
     accountIdFields: [
       { label: "ID Pemain (UID)", name: "uid", placeholder: "Masukkan ID Pemain", type: "text" },
     ],
-    packages: [
-      { id: "ff_pkg1", name: "100 Diamonds", diamonds: 100, price: convertPriceToIDR(0.99), iconName: "Gem" },
-      { id: "ff_pkg2", name: "210 Diamonds", diamonds: 210, price: convertPriceToIDR(1.99), bonus: "+21 Bonus", iconName: "Gem" },
-      { id: "ff_pkg3", name: "530 Diamonds", diamonds: 530, price: convertPriceToIDR(4.99), bonus: "+53 Bonus", iconName: "Gem" },
-      { id: "ff_pkg4", name: "1080 Diamonds", diamonds: 1080, price: convertPriceToIDR(9.99), bonus: "+108 Bonus", iconName: "Gem" },
-    ],
+    packages: [], // Akan diisi oleh API
   },
+  // Tambahkan game lain di sini jika ada data statisnya
 ];
 
 export const getGameBySlug = (slug: string): Game | undefined => {
+  // Mencari di data statis. Ini akan memberikan AccountIdFields dan categoryId.
+  // Informasi lain seperti nama, deskripsi, imageUrl akan dioverride oleh data dari /category di page.tsx.
+  // Dan packages akan dioverride oleh data dari /service di [gameSlug]/page.tsx.
   return gamesData.find((game) => game.slug === slug);
+};
+
+// Helper function to parse diamonds from package name
+export const parseDiamondsFromName = (name: string): number | undefined => {
+  const match = name.match(/(\d+)\s*Diamonds/i);
+  if (match && match[1]) {
+    return parseInt(match[1], 10);
+  }
+  return undefined;
 };

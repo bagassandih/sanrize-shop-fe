@@ -4,9 +4,9 @@ import type { Game } from '@/lib/data'; // Pastikan tipe Game diimpor
 
 // Interface untuk struktur data game dari API /category
 interface ApiCategoryItem {
-  id: number;
+  id: number; // ID numerik, misal 1001
   created_at: string;
-  code: string; // Digunakan untuk slug dan id internal
+  code: string; // Digunakan untuk slug dan id internal game, misal "mobile-legends"
   name: string; // Nama game
   img_logo: string; // URL logo game
   img_banner: string;
@@ -35,8 +35,6 @@ async function getGames(): Promise<Game[]> {
 
     const apiResponse = await res.json();
     
-    // Asumsikan API mengembalikan array langsung atau objek dengan properti yang berisi array
-    // Jika API mengembalikan objek seperti { data: [...] }, sesuaikan di sini
     const categories: ApiCategoryItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
 
     if (!Array.isArray(categories)) {
@@ -47,19 +45,19 @@ async function getGames(): Promise<Game[]> {
     return categories
       .filter(apiItem => apiItem.status === 'active') // Filter hanya game yang aktif
       .map((apiItem): Game => {
-        // Ambil satu atau dua kata pertama dari nama game untuk dataAiHint
         const nameParts = apiItem.name.toLowerCase().split(/\s+/);
         const hintKeywords = nameParts.slice(0, 2).join(' ');
 
         return {
-          id: apiItem.code, // Menggunakan 'code' sebagai ID unik
+          id: apiItem.code, // Menggunakan 'code' sebagai ID unik internal aplikasi (slug)
+          categoryId: apiItem.id, // ID numerik dari API untuk pemanggilan /service
           name: apiItem.name,
           slug: apiItem.code, // Menggunakan 'code' sebagai slug
-          imageUrl: apiItem.img_logo, // Menggunakan 'img_logo' untuk gambar
-          dataAiHint: hintKeywords, // Hint untuk AI, misal "mobile legends"
-          description: `Top up untuk ${apiItem.name}. Pilih paket terbaikmu!`, // Deskripsi generik
-          packages: [], // Endpoint /category tidak menyediakan ini, akan kosong
-          accountIdFields: [], // Endpoint /category tidak menyediakan ini, akan kosong
+          imageUrl: apiItem.img_logo, 
+          dataAiHint: hintKeywords, 
+          description: `Top up untuk ${apiItem.name}. Pilih paket terbaikmu!`,
+          packages: [], // Akan diisi dinamis pada halaman detail game
+          accountIdFields: [], // Akan diambil dari data statis atau API lain jika ada
         };
       });
   } catch (error) {

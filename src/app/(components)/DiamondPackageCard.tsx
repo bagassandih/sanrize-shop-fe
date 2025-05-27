@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Gem } from 'lucide-react';
+import Image from 'next/image';
 
 interface DiamondPackageCardProps {
   pkg: DiamondPackage;
-  onSelectPackage: (pkg: DiamondPackage) => void; // Renamed for clarity
-  onInitiatePurchase: (pkg: DiamondPackage) => void; // New prop for "Beli" button action
+  onSelectPackage: (pkg: DiamondPackage) => void;
+  onInitiatePurchase: (pkg: DiamondPackage) => void;
   isSelected: boolean;
 }
 
@@ -25,14 +26,31 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
         "overflow-hidden shadow-lg transition-all duration-300 ease-in-out cursor-pointer flex flex-col",
         isSelected ? "ring-2 ring-accent scale-105 shadow-accent/50" : "hover:shadow-primary/30 hover:scale-102"
       )}
-      onClick={() => onSelectPackage(pkg)} // Card click now only calls onSelectPackage
+      onClick={() => onSelectPackage(pkg)}
     >
-      <CardHeader className="pb-2 pt-4">
-        {pkg.iconName === "Gem" && <Gem className="h-8 w-8 sm:h-10 sm:w-10 mx-auto text-accent mb-2" />}
-        <CardTitle className="text-lg sm:text-xl font-semibold text-center text-accent">{pkg.name}</CardTitle>
+      <CardHeader className="pb-2 pt-4 items-center">
+        {pkg.imageUrl ? (
+          <div className="relative h-10 w-10 sm:h-12 sm:w-12 mb-2">
+            <Image 
+              src={pkg.imageUrl} 
+              alt={pkg.name} 
+              layout="fill" 
+              objectFit="contain" 
+              className="rounded-md"
+              data-ai-hint="game currency item" // Petunjuk umum jika tidak ada yang spesifik
+            />
+          </div>
+        ) : pkg.iconName === "Gem" ? (
+          <Gem className="h-8 w-8 sm:h-10 sm:w-10 mx-auto text-accent mb-2" />
+        ) : (
+          <div className="h-8 w-8 sm:h-10 sm:w-10 mx-auto mb-2"></div> // Placeholder jika tidak ada gambar/icon
+        )}
+        <CardTitle className="text-base sm:text-lg font-semibold text-center text-accent leading-tight">
+          {pkg.name}
+        </CardTitle>
       </CardHeader>
-      <CardContent className="text-center pb-2 flex-grow pt-2">
-        <p className="text-xl sm:text-2xl font-bold text-foreground mb-1">{formatPriceIDR(pkg.price)}</p>
+      <CardContent className="text-center pb-2 flex-grow pt-1">
+        <p className="text-lg sm:text-xl font-bold text-foreground mb-1">{formatPriceIDR(pkg.price)}</p>
         {pkg.bonus && <p className="text-xs sm:text-sm text-accent font-medium">{pkg.bonus}</p>}
       </CardContent>
       <CardFooter className="p-3 sm:p-4 mt-auto">
@@ -41,8 +59,8 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
           className="w-full text-xs sm:text-sm"
           aria-pressed={isSelected}
           onClick={(e) => {
-            e.stopPropagation(); // Prevent card's onClick from firing
-            onInitiatePurchase(pkg); // "Beli" button click initiates purchase (opens dialog)
+            e.stopPropagation(); 
+            onInitiatePurchase(pkg);
           }}
         >
           Beli
