@@ -6,6 +6,6 @@ export default function HomePage() {
   const games = gamesData;
 
   return (
-    <GameSelectionClient games={games} />
+    <GameSelectionClient games={games} /> 
   );
 }
