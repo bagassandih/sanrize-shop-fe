@@ -27,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark"> {/* Apply dark class to html for dark theme by default */}
+    <html lang="en" className="dark">{/* Apply dark class to html for dark theme by default */}
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}>
         <PurchaseProvider>
           <div className="flex flex-col min-h-screen">
