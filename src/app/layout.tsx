@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
@@ -27,7 +28,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">{/* Apply dark class to html for dark theme by default */}
+    <html lang="en" className="dark">
+      {/* Apply dark class to html for dark theme by default */}
+      <head>
+        {/* Next.js automatically populates head based on metadata and font imports.
+            This explicit <head> tag helps ensure proper structure. */}
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}>
         <PurchaseProvider>
           <div className="flex flex-col min-h-screen">
