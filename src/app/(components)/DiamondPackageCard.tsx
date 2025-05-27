@@ -17,6 +17,7 @@ interface DiamondPackageCardProps {
 
 const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelected }: DiamondPackageCardProps) => {
   const formatPriceIDR = (price: number) => {
+    if (price === undefined || price === null) return "Rp 0";
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
   };
 
@@ -44,7 +45,7 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
           <Gem className="h-8 w-8 sm:h-10 sm:w-10 mx-auto text-accent mb-2" />
         ) : (
           <div className="h-8 w-8 sm:h-10 sm:w-10 mx-auto mb-2 bg-muted rounded-md flex items-center justify-center">
-             <Gem className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" /> {/* Fallback generic icon */}
+             <Gem className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
           </div>
         )}
         <CardTitle className="text-base sm:text-lg font-semibold text-center text-accent leading-tight">
