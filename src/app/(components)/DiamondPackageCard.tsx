@@ -19,7 +19,7 @@ const DiamondPackageCard = ({ pkg, onSelect, isSelected }: DiamondPackageCardPro
   };
 
   return (
-    <Card 
+    <Card
       className={cn(
         "overflow-hidden shadow-lg transition-all duration-300 ease-in-out cursor-pointer flex flex-col",
         isSelected ? "ring-2 ring-accent scale-105 shadow-accent/50" : "hover:shadow-primary/30 hover:scale-102"
@@ -30,18 +30,17 @@ const DiamondPackageCard = ({ pkg, onSelect, isSelected }: DiamondPackageCardPro
         {pkg.iconName === "Gem" && <Gem className="h-8 w-8 sm:h-10 sm:w-10 mx-auto text-accent mb-2" />}
         <CardTitle className="text-lg sm:text-xl font-semibold text-center text-accent">{pkg.name}</CardTitle>
       </CardHeader>
-      <CardContent className="text-center pb-2 flex-grow">
-        {/* Menghilangkan tampilan jumlah diamond eksplisit karena sudah ada di pkg.name */}
-        {/* <p className="text-2xl sm:text-3xl font-bold text-foreground">{pkg.diamonds.toLocaleString('id-ID')}</p> */}
+      <CardContent className="text-center pb-2 flex-grow pt-2">
+        <p className="text-xl sm:text-2xl font-bold text-foreground mb-1">{formatPriceIDR(pkg.price)}</p>
         {pkg.bonus && <p className="text-xs sm:text-sm text-accent font-medium">{pkg.bonus}</p>}
       </CardContent>
       <CardFooter className="p-3 sm:p-4 mt-auto">
-        <Button 
-          variant={isSelected ? "default" : "outline"} 
+        <Button
+          variant={isSelected ? "default" : "outline"}
           className="w-full text-xs sm:text-sm"
           aria-pressed={isSelected}
         >
-          {isSelected ? 'Terpilih' : `${formatPriceIDR(pkg.price)}`}
+          Beli
         </Button>
       </CardFooter>
     </Card>
