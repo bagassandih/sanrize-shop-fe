@@ -84,10 +84,10 @@ const ConfirmationClient = () => {
               {selectedPackage.iconName === "Gem" && <Gem className="h-5 w-5 sm:h-7 sm:w-7 md:h-8 md:w-8 text-accent" />}
               <div>
                 <p className="font-medium text-foreground text-xs sm:text-sm md:text-base">{selectedPackage.name}</p>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  {selectedPackage.diamonds.toLocaleString('id-ID')} Diamonds
-                  {selectedPackage.bonus && ` (${selectedPackage.bonus})`}
-                </p>
+                {/* Menampilkan bonus jika ada. pkg.name sudah mencakup jumlah diamond */}
+                {selectedPackage.bonus && (
+                  <p className="text-xs sm:text-sm text-accent">{selectedPackage.bonus}</p>
+                )}
               </div>
               <p className="ml-auto font-semibold text-foreground text-xs sm:text-sm md:text-base">{formatPriceIDR(selectedPackage.price)}</p>
             </div>

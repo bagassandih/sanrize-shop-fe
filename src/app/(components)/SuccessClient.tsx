@@ -53,7 +53,7 @@ const SuccessClient = () => {
         <Card className="w-full max-w-md shadow-xl mb-6 sm:mb-8 bg-card">
             <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="text-lg sm:text-xl md:text-2xl text-primary flex items-center justify-center">
-                    <CheckCircle className="mr-2 h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7"/> Ringkasan Pesanan
+                    <CheckCircle className="mr-2 h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:h-7"/> Ringkasan Pesanan
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 sm:space-y-3 text-left text-xs sm:text-sm md:text-base p-4 sm:p-6 pt-0">
@@ -63,7 +63,10 @@ const SuccessClient = () => {
                 </div>
                 <div className="flex justify-between">
                     <span className="text-muted-foreground">Paket:</span>
-                    <span className="font-medium text-foreground">{selectedPackage.name} ({selectedPackage.diamonds.toLocaleString('id-ID')} Diamonds)</span>
+                    <span className="font-medium text-foreground">
+                        {selectedPackage.name}
+                        {selectedPackage.bonus && ` ${selectedPackage.bonus}`}
+                    </span>
                 </div>
                 {accountDetails && Object.entries(accountDetails).map(([key, value]) => {
                      const fieldLabel = selectedGame.accountIdFields.find(f => f.name === key)?.label || key;
