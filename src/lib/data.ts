@@ -17,6 +17,7 @@ export interface AccountIdField {
   placeholder: string;
   type?: string;
 }
+
 export interface Game {
   id: string; // slug from apiItem.code
   categoryId: number; // numeric id from apiItem.id
@@ -30,9 +31,15 @@ export interface Game {
 }
 
 export const parseDiamondsFromName = (name: string): number | undefined => {
+  // accountIdFields: [
+  //   { label: "ID Pengguna", name: "userId", placeholder: "Masukkan ID Pengguna", type: "text" },
+  //   { label: "ID Zona", name: "zoneId", placeholder: "Masukkan ID Zona (cth: 1234)", type: "text" },
+  // ],
+  
   const match = name.match(/(\d+)\s*Diamonds/i) || name.match(/(\d+)\s*Points/i) || name.match(/(\d+)\s*VP/i);
   if (match && match[1]) {
     return parseInt(match[1], 10);
   }
   return undefined;
 };
+
