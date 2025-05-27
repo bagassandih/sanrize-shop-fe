@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Game, DiamondPackage, AccountIdField } from '@/lib/data';
@@ -84,15 +85,15 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
           data-ai-hint={game.dataAiHint}
         />
         <div>
-          <h1 className="text-4xl font-bold text-accent mb-2">{game.name}</h1>
-          <p className="text-lg text-muted-foreground">{game.description}</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-accent mb-2">{game.name}</h1>
+          <p className="text-base sm:text-lg text-muted-foreground">{game.description}</p>
         </div>
       </div>
 
       <div>
         <div className="flex items-center space-x-2 mb-6">
-          <Gem className="h-8 w-8 text-primary" />
-          <h2 className="text-3xl font-semibold text-foreground">Select Diamond Package</h2>
+          <Gem className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
+          <h2 className="text-2xl sm:text-3xl font-semibold text-foreground">Select Diamond Package</h2>
         </div>
         {game.packages.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -121,7 +122,7 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 p-6 bg-card rounded-lg shadow-xl">
           <div>
-            <h2 className="text-2xl font-semibold text-foreground mb-4">Enter Account Details</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-4">Enter Account Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {game.accountIdFields.map((field) => (
                 <FormField
@@ -158,3 +159,4 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
 };
 
 export default DiamondPackagesClient;
+

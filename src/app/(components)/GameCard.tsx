@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Game } from '@/lib/data';
@@ -26,8 +27,8 @@ const GameCard = ({ game }: GameCardProps) => {
         </div>
       </CardHeader>
       <CardContent className="p-6">
-        <CardTitle className="text-2xl font-bold text-accent mb-2">{game.name}</CardTitle>
-        <CardDescription className="text-muted-foreground min-h-[40px]">{game.description}</CardDescription>
+        <CardTitle className="text-xl sm:text-2xl font-bold text-accent mb-2">{game.name}</CardTitle>
+        <CardDescription className="text-sm text-muted-foreground min-h-[3em]">{game.description}</CardDescription>
       </CardContent>
       <CardFooter>
         <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
@@ -41,3 +42,4 @@ const GameCard = ({ game }: GameCardProps) => {
 };
 
 export default GameCard;
+

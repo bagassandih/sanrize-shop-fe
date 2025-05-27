@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { Game } from '@/lib/data';
@@ -15,7 +16,7 @@ const GameSelectionClient = ({ games }: GameSelectionClientProps) => {
         <h1 className="text-4xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent sm:text-5xl lg:text-6xl mb-4">
           Welcome to Sanrize Shop
         </h1>
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+        <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
           Select your game to top up Diamonds and enhance your gaming experience. Quick, easy, and secure.
         </p>
       </div>
@@ -39,3 +40,4 @@ const GameSelectionClient = ({ games }: GameSelectionClientProps) => {
 };
 
 export default GameSelectionClient;
+
