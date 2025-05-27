@@ -32,7 +32,7 @@ const DiamondPackageCard = ({ pkg, onSelect, isSelected }: DiamondPackageCardPro
       </CardHeader>
       <CardContent className="text-center pb-2 flex-grow"> {/* Added flex-grow */}
         <p className="text-2xl sm:text-3xl font-bold text-foreground">{pkg.diamonds.toLocaleString('id-ID')}</p>
-        {pkg.bonus && <p className="text-xs sm:text-sm text-primary">{pkg.bonus}</p>}
+        {pkg.bonus && <p className="text-xs sm:text-sm text-accent font-medium">{pkg.bonus}</p>} {/* Changed text-primary to text-accent and added font-medium for emphasis */}
       </CardContent>
       <CardFooter className="p-3 sm:p-4 mt-auto"> {/* Added mt-auto */}
         <Button 
