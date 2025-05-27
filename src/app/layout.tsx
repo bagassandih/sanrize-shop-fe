@@ -6,7 +6,6 @@ import { PurchaseProvider } from '@/app/(store)/PurchaseContext';
 import Header from '@/app/(components)/Header';
 import { Toaster } from "@/components/ui/toaster";
 
-
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
@@ -18,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Sanrize Shop - Game Top Ups',
-  description: 'Top up your favorite games like Mobile Legends and Free Fire easily and quickly at Sanrize Shop.',
+  title: 'Sanrize Shop - Top Up Game',
+  description: 'Top up game favorit Anda seperti Mobile Legends dan Free Fire dengan mudah dan cepat di Sanrize Shop.',
 };
 
 export default function RootLayout({
@@ -28,11 +27,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      {/* Apply dark class to html for dark theme by default */}
+    // Apply dark class to html for dark theme by default
+    // Ensure no leading/trailing whitespace around <html> or <body> tags
+    <html lang="id" className="dark">
       <head>
         {/* Next.js automatically populates head based on metadata and font imports.
-            This explicit <head> tag helps ensure proper structure. */}
+            This explicit <head> tag helps ensure proper structure and avoid hydration errors. */}
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}>
         <PurchaseProvider>
@@ -41,8 +41,8 @@ export default function RootLayout({
             <main className="flex-grow container mx-auto px-4 py-8">
               {children}
             </main>
-            <footer className="py-6 text-center text-muted-foreground">
-              © {new Date().getFullYear()} Sanrize Shop. All rights reserved.
+            <footer className="py-6 text-center text-muted-foreground text-sm">
+              © {new Date().getFullYear()} Sanrize Shop. Hak cipta dilindungi undang-undang.
             </footer>
           </div>
           <Toaster />

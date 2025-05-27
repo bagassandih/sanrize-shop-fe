@@ -14,7 +14,7 @@ interface GameCardProps {
 
 const GameCard = ({ game }: GameCardProps) => {
   return (
-    <Card className="overflow-hidden shadow-lg hover:shadow-primary/50 transition-all duration-300 ease-in-out transform hover:-translate-y-1">
+    <Card className="overflow-hidden shadow-lg hover:shadow-primary/50 transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col">
       <CardHeader className="p-0">
         <div className="aspect-video relative w-full">
           <Image
@@ -26,14 +26,16 @@ const GameCard = ({ game }: GameCardProps) => {
           />
         </div>
       </CardHeader>
-      <CardContent className="p-6">
-        <CardTitle className="text-xl sm:text-2xl font-bold text-accent mb-2">{game.name}</CardTitle>
-        <CardDescription className="text-sm text-muted-foreground min-h-[3em]">{game.description}</CardDescription>
+      <CardContent className="p-4 sm:p-6 flex-grow">
+        <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-accent mb-1 sm:mb-2">{game.name}</CardTitle>
+        <CardDescription className="text-xs sm:text-sm text-muted-foreground min-h-[2.5em] sm:min-h-[3em] line-clamp-2 sm:line-clamp-3">
+          {game.description}
+        </CardDescription>
       </CardContent>
-      <CardFooter>
-        <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+      <CardFooter className="p-3 sm:p-4 mt-auto">
+        <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm">
           <Link href={`/games/${game.slug}`}>
-            Select Game <ArrowRight className="ml-2 h-5 w-5" />
+            Pilih Game <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
           </Link>
         </Button>
       </CardFooter>
@@ -42,4 +44,3 @@ const GameCard = ({ game }: GameCardProps) => {
 };
 
 export default GameCard;
-

@@ -1,3 +1,4 @@
+
 import { getGameBySlug } from '@/lib/data';
 import DiamondPackagesClient from '@/app/(components)/DiamondPackagesClient';
 import { notFound } from 'next/navigation';
@@ -11,12 +12,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const game = getGameBySlug(params.gameSlug);
   if (!game) {
     return {
-      title: "Game Not Found - Sanrize Shop"
+      title: "Game Tidak Ditemukan - Sanrize Shop"
     }
   }
   return {
-    title: `${game.name} Diamond Packages - Sanrize Shop`,
-    description: `Purchase ${game.name} diamonds and in-game currency. Fast and secure top-ups at Sanrize Shop.`,
+    title: `Paket Diamond ${game.name} - Sanrize Shop`,
+    description: `Beli diamond ${game.name} dan mata uang dalam game. Top-up cepat dan aman di Sanrize Shop.`,
   };
 }
 
@@ -26,7 +27,7 @@ export default function GamePackagesPage({ params }: Props) {
   const game = getGameBySlug(gameSlug);
 
   if (!game) {
-    notFound(); // Triggers the not-found page
+    notFound();
   }
 
   return (
