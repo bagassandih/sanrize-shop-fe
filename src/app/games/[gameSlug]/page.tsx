@@ -38,23 +38,30 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
   }
 
   try {
-    const res = await fetch(`${apiUrl}/service?idCategory=${categoryId}`, {
+    const res = await fetch(`${apiUrl}/service`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ idCategory: categoryId }),
       next: { revalidate: 600 } // Revalidasi setiap 10 menit
     });
 
     if (!res.ok) {
       console.error(`Gagal mengambil paket untuk kategori ${categoryId}: ${res.status} ${res.statusText}`);
+      const errorBody = await res.text();
+      console.error("Error body:", errorBody);
       return [];
     }
 
     const apiResponse = await res.json();
     const serviceItems: ApiServiceItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
-
+    
     if (!Array.isArray(serviceItems)) {
-        console.error("Format respons API service tidak valid, diharapkan array.");
+        console.error("Format respons API service tidak valid, diharapkan array. Diterima:", apiResponse);
         return [];
     }
-
+    
     return serviceItems
       .filter(item => item.status === 'available')
       .map((item): DiamondPackage => ({
@@ -126,11 +133,9 @@ export default async function GamePackagesPage({ params }: Props) {
   let actualCategoryId = staticGameData.categoryId; // Use static categoryId as primary
 
 
-  // 2. Ambil data game dinamis (nama, gambar logo) dari API /category
+  // 2. Ambil data game dinamis (nama, gambar logo, categoryId aktual) dari API /category
   if (apiUrl) {
     try {
-      // Fetch all categories and find the specific one by code (slug)
-      // This is simpler if the API doesn't have a direct endpoint like /category?code={slug}
       const res = await fetch(`${apiUrl}/category`, { next: { revalidate: 600 } }); 
       if (res.ok) {
         const apiResponse = await res.json();
@@ -141,12 +146,9 @@ export default async function GamePackagesPage({ params }: Props) {
           dynamicGameName = currentGameApiData.name;
           dynamicGameImageUrl = currentGameApiData.img_logo;
           dynamicGameDescription = `Top up untuk ${currentGameApiData.name}. Pilih paket terbaikmu!`;
-          actualCategoryId = currentGameApiData.id; // Use categoryId from API if available
+          actualCategoryId = currentGameApiData.id; // Gunakan categoryId dari API jika tersedia
         } else {
           console.warn(`Game dengan slug ${gameSlug} tidak ditemukan atau tidak aktif di API /category. Menggunakan data statis.`);
-          // If not found in API, it might mean the game is defined statically but not in API, or slug mismatch
-          // For now, we allow falling back to static data defined above.
-          // If strict API-only is required, one might call notFound() here.
         }
       } else {
         console.error(`Gagal mengambil data kategori untuk ${gameSlug}: ${res.status}. Menggunakan data statis.`);
@@ -162,9 +164,9 @@ export default async function GamePackagesPage({ params }: Props) {
 
   // 4. Gabungkan data game dasar dengan paket dinamis
   const gameForClient: Game = {
-    ...staticGameData, // Ini termasuk id (slug dari static), accountIdFields
-    id: gameSlug, // Ensure id is the slug
-    categoryId: actualCategoryId, // Use the potentially updated categoryId
+    ...staticGameData, // Ini termasuk accountIdFields
+    id: gameSlug, // Pastikan id adalah slug
+    categoryId: actualCategoryId, // Gunakan categoryId yang mungkin diperbarui
     name: dynamicGameName, 
     slug: gameSlug, 
     imageUrl: dynamicGameImageUrl, 
