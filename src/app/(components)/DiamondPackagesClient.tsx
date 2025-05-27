@@ -23,24 +23,34 @@ interface DiamondPackagesClientProps {
 
 const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
   const router = useRouter();
-  const { selectedPackage, setSelectedGame, setSelectedPackage, setAccountDetails } = usePurchase();
-  const [currentSelectedPackage, setCurrentSelectedPackage] = useState<DiamondPackage | null>(selectedPackage);
+  const { selectedPackage: contextSelectedPackage, setSelectedGame, setSelectedPackage, setAccountDetails } = usePurchase();
+  const [currentSelectedPackage, setCurrentSelectedPackage] = useState<DiamondPackage | null>(null);
   const [isAccountDialogOpen, setAccountDialogOpen] = useState(false);
 
   useEffect(() => {
     setSelectedGame(game);
-    if (selectedPackage && game.packages.some(p => p.id === selectedPackage.id)) {
-      setCurrentSelectedPackage(selectedPackage);
+    // Initialize currentSelectedPackage from context if available and matches current game packages
+    if (contextSelectedPackage && game.packages.some(p => p.id === contextSelectedPackage.id)) {
+      setCurrentSelectedPackage(contextSelectedPackage);
     } else {
       setCurrentSelectedPackage(null);
-      setSelectedPackage(null);
+      // setSelectedPackage(null); // Don't nullify context package here unless explicitly navigating away
     }
-  }, [game, setSelectedGame, selectedPackage, setSelectedPackage]);
+  }, [game, setSelectedGame, contextSelectedPackage]);
 
+  // Called when a card is clicked (for visual selection)
   const handlePackageSelect = (pkg: DiamondPackage) => {
     setCurrentSelectedPackage(pkg);
+    setSelectedPackage(pkg); // Also update context immediately for consistency
+    // Do NOT open dialog here
+  };
+
+  // Called when the "Beli" button inside a card is clicked
+  const handleInitiatePurchase = (pkg: DiamondPackage) => {
+    // Ensure the correct package is set before opening the dialog
+    setCurrentSelectedPackage(pkg); 
     setSelectedPackage(pkg);
-    setAccountDialogOpen(true); // Buka dialog setelah paket dipilih
+    setAccountDialogOpen(true); 
   };
 
   const createSchema = (fields: AccountIdField[]) => {
@@ -66,6 +76,7 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
   
   useEffect(() => {
     if (isAccountDialogOpen && currentSelectedPackage) {
+      // Reset form when dialog opens with a selected package
       form.reset(game.accountIdFields.reduce((acc, field) => {
         acc[field.name] = ''; 
         return acc;
@@ -77,6 +88,7 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
   const onSubmit: SubmitHandler<FormData> = (data) => {
     if (!currentSelectedPackage) {
       console.error("Paket tidak terpilih saat submit form dialog.");
+      // Potentially show a toast message to the user
       return;
     }
     setAccountDetails(data);
@@ -119,7 +131,8 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
               <DiamondPackageCard
                 key={pkg.id}
                 pkg={pkg}
-                onSelect={() => handlePackageSelect(pkg)}
+                onSelectPackage={handlePackageSelect}
+                onInitiatePurchase={handleInitiatePurchase}
                 isSelected={currentSelectedPackage?.id === pkg.id}
               />
             ))}

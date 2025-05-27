@@ -9,11 +9,12 @@ import { Gem } from 'lucide-react';
 
 interface DiamondPackageCardProps {
   pkg: DiamondPackage;
-  onSelect: () => void;
+  onSelectPackage: (pkg: DiamondPackage) => void; // Renamed for clarity
+  onInitiatePurchase: (pkg: DiamondPackage) => void; // New prop for "Beli" button action
   isSelected: boolean;
 }
 
-const DiamondPackageCard = ({ pkg, onSelect, isSelected }: DiamondPackageCardProps) => {
+const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelected }: DiamondPackageCardProps) => {
   const formatPriceIDR = (price: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
   };
@@ -24,7 +25,7 @@ const DiamondPackageCard = ({ pkg, onSelect, isSelected }: DiamondPackageCardPro
         "overflow-hidden shadow-lg transition-all duration-300 ease-in-out cursor-pointer flex flex-col",
         isSelected ? "ring-2 ring-accent scale-105 shadow-accent/50" : "hover:shadow-primary/30 hover:scale-102"
       )}
-      onClick={onSelect}
+      onClick={() => onSelectPackage(pkg)} // Card click now only calls onSelectPackage
     >
       <CardHeader className="pb-2 pt-4">
         {pkg.iconName === "Gem" && <Gem className="h-8 w-8 sm:h-10 sm:w-10 mx-auto text-accent mb-2" />}
@@ -39,6 +40,10 @@ const DiamondPackageCard = ({ pkg, onSelect, isSelected }: DiamondPackageCardPro
           variant={isSelected ? "default" : "outline"}
           className="w-full text-xs sm:text-sm"
           aria-pressed={isSelected}
+          onClick={(e) => {
+            e.stopPropagation(); // Prevent card's onClick from firing
+            onInitiatePurchase(pkg); // "Beli" button click initiates purchase (opens dialog)
+          }}
         >
           Beli
         </Button>
