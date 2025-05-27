@@ -14,7 +14,7 @@ import { useForm, type SubmitHandler } from 'react-hook-form';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { AlertCircle, Gem, ShoppingCart, Info } from 'lucide-react';
+import { AlertCircle, Gem, ShoppingCart, Info, ArrowLeft } from 'lucide-react';
 import Image from 'next/image';
 
 interface DiamondPackagesClientProps {
@@ -64,11 +64,10 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
     }, {} as Record<string, string>),
   });
   
-  // Reset form errors and values when dialog opens or selected package changes
   useEffect(() => {
     if (isAccountDialogOpen && currentSelectedPackage) {
       form.reset(game.accountIdFields.reduce((acc, field) => {
-        acc[field.name] = ''; // Reset to empty
+        acc[field.name] = ''; 
         return acc;
       }, {} as Record<string, string>));
     }
@@ -77,7 +76,6 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
 
   const onSubmit: SubmitHandler<FormData> = (data) => {
     if (!currentSelectedPackage) {
-      // Ini seharusnya tidak terjadi karena dialog hanya terbuka jika paket dipilih
       console.error("Paket tidak terpilih saat submit form dialog.");
       return;
     }
@@ -88,25 +86,32 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
 
   return (
     <div className="space-y-8 sm:space-y-10">
+      <div className="mb-4">
+        <Button variant="outline" onClick={() => router.back()} size="sm" className="text-xs sm:text-sm">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Kembali ke Pilih Game
+        </Button>
+      </div>
+
       <div className="flex flex-col md:flex-row items-center md:items-start gap-4 sm:gap-6 p-4 sm:p-6 bg-card rounded-lg shadow-xl">
         <Image 
           src={game.imageUrl} 
           alt={game.name} 
           width={120} 
           height={120} 
-          className="rounded-lg border-2 border-primary object-cover sm:w-[150px] sm:h-[150px]"
+          className="rounded-lg border-2 border-primary object-cover w-[100px] h-[100px] sm:w-[150px] sm:h-[150px]"
           data-ai-hint={game.dataAiHint}
         />
-        <div className="mt-2 md:mt-0">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-accent mb-1 sm:mb-2">{game.name}</h1>
-          <p className="text-sm sm:text-base md:text-lg text-muted-foreground">{game.description}</p>
+        <div className="mt-2 md:mt-0 text-center md:text-left">
+          <h1 className="text-xl sm:text-3xl md:text-4xl font-bold text-accent mb-1 sm:mb-2">{game.name}</h1>
+          <p className="text-xs sm:text-base md:text-lg text-muted-foreground">{game.description}</p>
         </div>
       </div>
 
       <div>
         <div className="flex items-center space-x-2 mb-4 sm:mb-6">
-          <Gem className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-primary" />
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold text-foreground">Pilih Paket Diamond</h2>
+          <Gem className="h-5 w-5 sm:h-7 sm:w-7 md:h-8 md:w-8 text-primary" />
+          <h2 className="text-lg sm:text-2xl md:text-3xl font-semibold text-foreground">Pilih Paket Diamond</h2>
         </div>
         {game.packages.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
@@ -120,7 +125,7 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
             ))}
           </div>
         ) : (
-          <p className="text-center text-muted-foreground">Tidak ada paket diamond yang tersedia untuk {game.name}.</p>
+          <p className="text-center text-muted-foreground text-sm sm:text-base">Tidak ada paket diamond yang tersedia untuk {game.name}.</p>
         )}
       </div>
       
@@ -128,17 +133,17 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
         <Dialog open={isAccountDialogOpen} onOpenChange={setAccountDialogOpen}>
           <DialogContent className="sm:max-w-[425px] md:max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-xl sm:text-2xl text-accent flex items-center">
-                <Info className="mr-2 h-6 w-6" /> Masukkan Detail Akun
+              <DialogTitle className="text-lg sm:text-2xl text-accent flex items-center">
+                <Info className="mr-2 h-5 w-5 sm:h-6 sm:w-6" /> Masukkan Detail Akun
               </DialogTitle>
-              <DialogDescription className="text-sm sm:text-base">
+              <DialogDescription className="text-xs sm:text-base">
                 Untuk game <span className="font-semibold">{game.name}</span> dengan paket <span className="font-semibold">{currentSelectedPackage.name}</span>.
                  Pastikan data yang Anda masukkan sudah benar.
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pt-2">
-                <div className="grid grid-cols-1 gap-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6 pt-2">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4">
                   {game.accountIdFields.map((field) => (
                     <FormField
                       key={field.name}
@@ -146,13 +151,13 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
                       name={field.name as keyof FormData}
                       render={({ field: formField }) => (
                         <FormItem>
-                          <FormLabel className="text-sm text-primary">{field.label}</FormLabel>
+                          <FormLabel className="text-xs sm:text-sm text-primary">{field.label}</FormLabel>
                           <FormControl>
                             <Input 
                               placeholder={field.placeholder} 
                               {...formField} 
                               type={field.type || "text"}
-                              className="bg-background border-border focus:ring-primary focus:border-primary text-sm"
+                              className="bg-background border-border focus:ring-primary focus:border-primary text-xs sm:text-sm"
                             />
                           </FormControl>
                           <FormMessage className="text-xs"/>
@@ -161,7 +166,7 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
                     />
                   ))}
                 </div>
-                <DialogFooter className="mt-6 sm:mt-8">
+                <DialogFooter className="mt-4 sm:mt-8">
                   <DialogClose asChild>
                     <Button type="button" variant="outline" size="sm" className="text-xs sm:text-sm">Batal</Button>
                   </DialogClose>
