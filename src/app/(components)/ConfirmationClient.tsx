@@ -22,6 +22,7 @@ const ConfirmationClient = () => {
 
   const handleConfirmPurchase = async () => {
     setIsProcessing(true);
+    // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 2000)); 
     setIsProcessing(false);
     router.push('/success');
@@ -80,13 +81,18 @@ const ConfirmationClient = () => {
         <CardContent className="space-y-3 sm:space-y-6 p-4 sm:p-6 pt-0">
           <div>
             <h3 className="text-xs sm:text-base md:text-lg font-semibold text-primary mb-1">Paket Terpilih:</h3>
-            <div className="flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 bg-muted/30 rounded-md">
-              {selectedPackage.iconName === "Gem" && <Gem className="h-5 w-5 sm:h-7 sm:w-7 md:h-8 md:w-8 text-accent" />}
+            <div className="flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 bg-muted/30 rounded-md">
+              {selectedPackage.iconName === "Gem" || selectedPackage.imageUrl ? ( // Check for imageUrl as well
+                 selectedPackage.imageUrl ? (
+                    <Image src={selectedPackage.imageUrl} alt={selectedPackage.name} width={32} height={32} className="h-8 w-8 md:h-10 md:w-10 rounded-sm object-contain" data-ai-hint="package icon"/>
+                 ) : (
+                    <Gem className="h-5 w-5 sm:h-7 sm:w-7 md:h-8 md:w-8 text-accent mt-1" />
+                 )
+              ) : <div className="w-5 h-5 sm:w-7 sm:w-7 md:w-8 md:h-8"></div> /* Placeholder to maintain alignment */}
               <div>
                 <p className="font-medium text-foreground text-xs sm:text-sm md:text-base">{selectedPackage.name}</p>
-                {/* Menampilkan bonus jika ada. pkg.name sudah mencakup jumlah diamond */}
-                {selectedPackage.bonus && (
-                  <p className="text-xs sm:text-sm text-accent">{selectedPackage.bonus}</p>
+                {selectedPackage.bonus && String(selectedPackage.bonus).trim() !== "" && (
+                  <p className="text-xs sm:text-sm text-accent">Bonus: {String(selectedPackage.bonus)}</p>
                 )}
               </div>
               <p className="ml-auto font-semibold text-foreground text-xs sm:text-sm md:text-base">{formatPriceIDR(selectedPackage.price)}</p>

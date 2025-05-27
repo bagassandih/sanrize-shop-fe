@@ -27,6 +27,8 @@ const SuccessClient = () => {
   };
 
   if (!selectedGame || !selectedPackage) {
+    // This case might happen if the user directly navigates to /success or context is lost
+    // Provide a generic success message if key details are missing but still on success page
     return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
             <PartyPopper className="h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 text-green-500 mb-4 sm:mb-6" />
@@ -45,7 +47,7 @@ const SuccessClient = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] text-center p-4">
         <PartyPopper className="h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 text-green-500 mb-4 sm:mb-6 animate-bounce" />
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2 sm:mb-3">Terima Kasih! Pembelian Selesai!</h1>
+        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2 sm:mb-3">Terima Kasih! Pembelian Selesai!</h1>
         <p className="text-base sm:text-lg md:text-xl text-muted-foreground mb-6 sm:mb-8 max-w-xl">
             Diamonds Anda untuk <span className="font-semibold text-accent">{selectedGame.name}</span> telah berhasil diproses dan akan segera masuk ke akun Anda.
         </p>
@@ -61,12 +63,14 @@ const SuccessClient = () => {
                     <span className="text-muted-foreground">Game:</span>
                     <span className="font-medium text-foreground">{selectedGame.name}</span>
                 </div>
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Paket:</span>
-                    <span className="font-medium text-foreground">
-                        {selectedPackage.name}
-                        {selectedPackage.bonus && ` ${selectedPackage.bonus}`}
-                    </span>
+                <div className="flex justify-between items-start">
+                    <span className="text-muted-foreground pt-0.5">Paket:</span>
+                    <div className="text-right">
+                        <span className="font-medium text-foreground block">{selectedPackage.name}</span>
+                        {selectedPackage.bonus && String(selectedPackage.bonus).trim() !== "" && (
+                            <span className="text-xs text-accent block">Bonus: {String(selectedPackage.bonus)}</span>
+                        )}
+                    </div>
                 </div>
                 {accountDetails && Object.entries(accountDetails).map(([key, value]) => {
                      const fieldLabel = selectedGame.accountIdFields.find(f => f.name === key)?.label || key;

@@ -37,13 +37,15 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
               layout="fill" 
               objectFit="contain" 
               className="rounded-md"
-              data-ai-hint="game currency item" // Petunjuk umum jika tidak ada yang spesifik
+              data-ai-hint="game currency item" 
             />
           </div>
         ) : pkg.iconName === "Gem" ? (
           <Gem className="h-8 w-8 sm:h-10 sm:w-10 mx-auto text-accent mb-2" />
         ) : (
-          <div className="h-8 w-8 sm:h-10 sm:w-10 mx-auto mb-2"></div> // Placeholder jika tidak ada gambar/icon
+          <div className="h-8 w-8 sm:h-10 sm:w-10 mx-auto mb-2 bg-muted rounded-md flex items-center justify-center">
+             <Gem className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" /> {/* Fallback generic icon */}
+          </div>
         )}
         <CardTitle className="text-base sm:text-lg font-semibold text-center text-accent leading-tight">
           {pkg.name}
@@ -51,7 +53,9 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
       </CardHeader>
       <CardContent className="text-center pb-2 flex-grow pt-1">
         <p className="text-lg sm:text-xl font-bold text-foreground mb-1">{formatPriceIDR(pkg.price)}</p>
-        {pkg.bonus && <p className="text-xs sm:text-sm text-accent font-medium">{pkg.bonus}</p>}
+        {pkg.bonus && String(pkg.bonus).trim() !== "" && (
+          <p className="text-xs sm:text-sm text-accent font-medium">Bonus: {String(pkg.bonus)}</p>
+        )}
       </CardContent>
       <CardFooter className="p-3 sm:p-4 mt-auto">
         <Button

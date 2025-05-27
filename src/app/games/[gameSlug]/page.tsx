@@ -18,6 +18,18 @@ interface ApiServiceItem {
   bonus: string; // misal "5 + 0"
 }
 
+// Interface untuk struktur data game dari API /category
+interface ApiCategoryItem {
+  id: number; 
+  created_at: string;
+  code: string; 
+  name: string; 
+  img_logo: string; 
+  img_banner: string;
+  img_proof: string;
+  status: string; 
+}
+
 async function getPackagesForGame(categoryId: number, gameSlug: string): Promise<DiamondPackage[]> {
   const apiUrl = process.env.BASE_API_URL;
   if (!apiUrl) {
@@ -52,7 +64,6 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
         price: item.price,
         bonus: item.bonus,
         imageUrl: item.img,
-        // iconName: 'Gem', // Bisa dihapus jika imageUrl selalu ada atau tidak ingin fallback ke Gem
       }));
   } catch (error) {
     console.error(`Error fetching packages for category ${categoryId}:`, error);
@@ -65,9 +76,30 @@ type Props = {
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  // Untuk metadata, kita bisa mengambil nama game dari data statis atau fetch minimal
-  const staticGameData = getGameBySlug(params.gameSlug);
-  const gameName = staticGameData?.name || params.gameSlug.replace(/-/g, ' ');
+  const apiUrl = process.env.BASE_API_URL;
+  let gameName = params.gameSlug.replace(/-/g, ' '); // Fallback name
+
+  if (apiUrl) {
+    try {
+      const res = await fetch(`${apiUrl}/category`, { next: { revalidate: 3600 } });
+      if (res.ok) {
+        const apiResponse = await res.json();
+        const categories: ApiCategoryItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
+        const currentGameApiData = categories.find(cat => cat.code === params.gameSlug && cat.status === 'active');
+        if (currentGameApiData) {
+          gameName = currentGameApiData.name;
+        }
+      }
+    } catch (error) {
+      console.warn(`Could not fetch category details for metadata for slug ${params.gameSlug}:`, error);
+    }
+  } else {
+     // Fallback to static data if API URL is not defined
+    const staticGameData = getGameBySlug(params.gameSlug);
+    if (staticGameData) {
+      gameName = staticGameData.name;
+    }
+  }
   
   return {
     title: `Paket Diamond ${gameName} - Sanrize Shop`,
@@ -78,28 +110,67 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function GamePackagesPage({ params }: Props) {
   const { gameSlug } = params;
+  const apiUrl = process.env.BASE_API_URL;
   
-  // 1. Dapatkan data game dasar (termasuk categoryId dan accountIdFields)
-  const baseGameData = getGameBySlug(gameSlug);
+  // 1. Dapatkan data game dasar statis (terutama untuk accountIdFields dan categoryId fallback)
+  const staticGameData = getGameBySlug(gameSlug);
 
-  if (!baseGameData) {
+  if (!staticGameData) {
     notFound();
   }
 
-  // 2. Ambil data kategori game dari API (untuk nama dan gambar terbaru jika perlu, atau gunakan dari baseGameData)
-  //    Untuk saat ini, kita asumsikan baseGameData sudah cukup untuk nama, deskripsi, dll.
-  //    Jika ingin data nama/gambar game selalu terbaru dari API /category, perlu fetch di sini juga.
-  //    Kita akan menggunakan `baseGameData.categoryId` untuk mengambil paket.
+  // Default values from static data
+  let dynamicGameName = staticGameData.name;
+  let dynamicGameImageUrl = staticGameData.imageUrl;
+  let dynamicGameDescription = staticGameData.description;
+  let actualCategoryId = staticGameData.categoryId; // Use static categoryId as primary
 
-  // 3. Ambil paket diamond secara dinamis
-  const dynamicPackages = await getPackagesForGame(baseGameData.categoryId, gameSlug);
+
+  // 2. Ambil data game dinamis (nama, gambar logo) dari API /category
+  if (apiUrl) {
+    try {
+      // Fetch all categories and find the specific one by code (slug)
+      // This is simpler if the API doesn't have a direct endpoint like /category?code={slug}
+      const res = await fetch(`${apiUrl}/category`, { next: { revalidate: 600 } }); 
+      if (res.ok) {
+        const apiResponse = await res.json();
+        const categories: ApiCategoryItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
+        const currentGameApiData = categories.find(cat => cat.code === gameSlug && cat.status === 'active');
+
+        if (currentGameApiData) {
+          dynamicGameName = currentGameApiData.name;
+          dynamicGameImageUrl = currentGameApiData.img_logo;
+          dynamicGameDescription = `Top up untuk ${currentGameApiData.name}. Pilih paket terbaikmu!`;
+          actualCategoryId = currentGameApiData.id; // Use categoryId from API if available
+        } else {
+          console.warn(`Game dengan slug ${gameSlug} tidak ditemukan atau tidak aktif di API /category. Menggunakan data statis.`);
+          // If not found in API, it might mean the game is defined statically but not in API, or slug mismatch
+          // For now, we allow falling back to static data defined above.
+          // If strict API-only is required, one might call notFound() here.
+        }
+      } else {
+        console.error(`Gagal mengambil data kategori untuk ${gameSlug}: ${res.status}. Menggunakan data statis.`);
+      }
+    } catch (error) {
+      console.error(`Error mengambil data kategori untuk ${gameSlug}:`, error, `. Menggunakan data statis.`);
+    }
+  }
+
+
+  // 3. Ambil paket diamond secara dinamis menggunakan actualCategoryId
+  const dynamicPackages = await getPackagesForGame(actualCategoryId, gameSlug);
 
   // 4. Gabungkan data game dasar dengan paket dinamis
   const gameForClient: Game = {
-    ...baseGameData, // Ini termasuk id (slug), categoryId, name, slug, imageUrl (fallback), description, accountIdFields
-    name: baseGameData.name, // Pastikan menggunakan nama dari data yang lebih akurat jika ada
-    imageUrl: baseGameData.imageUrl, // Bisa juga di-override jika /category punya img_logo yg lebih baru
-    packages: dynamicPackages, // Override packages dengan yang dari API
+    ...staticGameData, // Ini termasuk id (slug dari static), accountIdFields
+    id: gameSlug, // Ensure id is the slug
+    categoryId: actualCategoryId, // Use the potentially updated categoryId
+    name: dynamicGameName, 
+    slug: gameSlug, 
+    imageUrl: dynamicGameImageUrl, 
+    description: dynamicGameDescription,
+    packages: dynamicPackages,
+    dataAiHint: dynamicGameName.toLowerCase().split(/\s+/).slice(0, 2).join(' '),
   };
 
   return (
