@@ -14,7 +14,7 @@ interface GameCardProps {
 
 const GameCard = ({ game }: GameCardProps) => {
   return (
-    <Card className="overflow-hidden shadow-lg hover:shadow-primary/50 transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col">
+    <Card className="overflow-hidden shadow-lg hover:shadow-xl hover:shadow-primary/60 hover:brightness-105 transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col">
       <CardHeader className="p-0">
         <div className="aspect-video relative w-full">
           <Image

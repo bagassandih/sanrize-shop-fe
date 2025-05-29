@@ -25,7 +25,7 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
     <Card
       className={cn(
         "overflow-hidden shadow-lg transition-all duration-300 ease-in-out cursor-pointer flex flex-col",
-        isSelected ? "ring-2 ring-accent scale-105 shadow-accent/50" : "hover:shadow-primary/30 hover:scale-102"
+        isSelected ? "ring-2 ring-accent scale-105 shadow-accent/50 brightness-105" : "hover:shadow-lg hover:shadow-primary/40 hover:scale-102 hover:brightness-105"
       )}
       onClick={() => onSelectPackage(pkg)}
     >
