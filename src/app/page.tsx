@@ -1,5 +1,6 @@
 
 import GameSelectionClient from '@/app/(components)/GameSelectionClient';
+import HowToOrderSection from '@/app/(components)/HowToOrderSection';
 import type { Game, AccountIdField } from '@/lib/data'; 
 
 interface ApiCategoryItem {
@@ -11,7 +12,7 @@ interface ApiCategoryItem {
   img_banner: string;
   img_proof: string;
   status: string; 
-  account_id_field?: AccountIdField[]; // Tambahkan ini, buat opsional untuk keamanan
+  account_id_field?: AccountIdField[];
 }
 
 async function getGames(): Promise<Game[]> {
@@ -36,10 +37,11 @@ async function getGames(): Promise<Game[]> {
 
     const apiResponse = await res.json();
     
+    // Cek apakah apiResponse adalah array atau objek dengan properti 'data'
     const categories: ApiCategoryItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
 
     if (!Array.isArray(categories)) {
-        console.error("Format respons API kategori tidak valid, diharapkan array. Diterima:", apiResponse);
+        console.error("Format respons API kategori tidak valid, diharapkan array atau objek dengan properti data array. Diterima:", apiResponse);
         return [];
     }
 
@@ -49,7 +51,6 @@ async function getGames(): Promise<Game[]> {
         const nameParts = apiItem.name.toLowerCase().split(/\s+/);
         const hintKeywords = nameParts.slice(0, 2).join(' ');
 
-        // Memastikan account_id_field adalah array, default ke array kosong jika tidak ada atau bukan array
         const accountIdFields = Array.isArray(apiItem.account_id_field) ? apiItem.account_id_field : [];
 
         return {
@@ -61,7 +62,7 @@ async function getGames(): Promise<Game[]> {
           dataAiHint: hintKeywords, 
           description: `Top up untuk ${apiItem.name}. Pilih paket terbaikmu!`,
           packages: [], 
-          accountIdFields: accountIdFields, // Ambil dari API
+          accountIdFields: accountIdFields,
         };
       });
   } catch (error) {
@@ -73,6 +74,9 @@ async function getGames(): Promise<Game[]> {
 export default async function HomePage() {
   const games = await getGames();
   return (
-    <GameSelectionClient games={games} /> 
+    <div className="space-y-12 sm:space-y-16 md:space-y-20">
+      <GameSelectionClient games={games} /> 
+      <HowToOrderSection />
+    </div>
   );
 }
