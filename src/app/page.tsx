@@ -11,6 +11,7 @@ interface ApiCategoryItem {
   img_banner: string;
   img_proof: string;
   status: string; 
+  account_id_field?: AccountIdField[]; // Tambahkan ini, buat opsional untuk keamanan
 }
 
 async function getGames(): Promise<Game[]> {
@@ -22,7 +23,6 @@ async function getGames(): Promise<Game[]> {
   }
 
   try {
-    // Menggunakan cache: 'no-store' untuk selalu mengambil data terbaru
     const res = await fetch(`${apiUrl}/category`, { 
       cache: 'no-store' 
     });
@@ -36,7 +36,6 @@ async function getGames(): Promise<Game[]> {
 
     const apiResponse = await res.json();
     
-    // Menyesuaikan dengan kemungkinan struktur {data: [...]} atau langsung [...]
     const categories: ApiCategoryItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
 
     if (!Array.isArray(categories)) {
@@ -50,6 +49,9 @@ async function getGames(): Promise<Game[]> {
         const nameParts = apiItem.name.toLowerCase().split(/\s+/);
         const hintKeywords = nameParts.slice(0, 2).join(' ');
 
+        // Memastikan account_id_field adalah array, default ke array kosong jika tidak ada atau bukan array
+        const accountIdFields = Array.isArray(apiItem.account_id_field) ? apiItem.account_id_field : [];
+
         return {
           id: apiItem.code, 
           categoryId: apiItem.id, 
@@ -59,7 +61,7 @@ async function getGames(): Promise<Game[]> {
           dataAiHint: hintKeywords, 
           description: `Top up untuk ${apiItem.name}. Pilih paket terbaikmu!`,
           packages: [], 
-          accountIdFields: [], // Akan diisi di halaman detail game
+          accountIdFields: accountIdFields, // Ambil dari API
         };
       });
   } catch (error) {

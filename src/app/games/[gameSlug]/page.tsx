@@ -26,6 +26,7 @@ interface ApiCategoryItem {
   img_banner: string;
   img_proof: string;
   status: string; 
+  account_id_field?: AccountIdField[]; // Tambahkan ini, buat opsional
 }
 
 async function getPackagesForGame(categoryId: number, gameSlug: string): Promise<DiamondPackage[]> {
@@ -42,7 +43,7 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ idCategory: categoryId }),
-      cache: 'no-store' // Selalu ambil data terbaru
+      cache: 'no-store' 
     });
 
     if (!res.ok) {
@@ -53,7 +54,6 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
     }
 
     const apiResponse = await res.json();
-     // Menyesuaikan dengan kemungkinan struktur {data: [...]} atau langsung [...]
     const serviceItems: ApiServiceItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
     
     if (!Array.isArray(serviceItems)) {
@@ -64,7 +64,7 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
     return serviceItems
       .filter(item => item.status === 'available')
       .map((item): DiamondPackage => ({
-        id: `${gameSlug}_${item.id}`, // Ensure unique package ID based on game and service item
+        id: `${gameSlug}_${item.id}`,
         name: item.name,
         diamonds: parseDiamondsFromName(item.name),
         price: item.price,
@@ -78,27 +78,7 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
   }
 }
 
-// Helper function to get account ID fields based on game slug (temporary solution)
-// Idealnya, ini datang dari API /category per game.
-const getAccountIdFieldsBySlug = (slug: string): AccountIdField[] => {
-  const lowerSlug = slug.toLowerCase();
-  if (lowerSlug === 'mobile-legends') {
-    return [
-      { label: "ID Pengguna", name: "userId", placeholder: "Masukkan ID Pengguna", type: "text" },
-      { label: "ID Zona", name: "zoneId", placeholder: "Masukkan ID Zona (cth: 1234)", type: "text" },
-    ];
-  }
-  if (lowerSlug === 'free-fire') {
-    return [{ label: "ID Pemain (UID)", name: "uid", placeholder: "Masukkan ID Pemain", type: "text" }];
-  }
-  if (lowerSlug === 'valorant') {
-     return [{ label: "Riot ID", name: "riotId", placeholder: "Masukkan Riot ID (Nama#Tag)", type: "text" }];
-  }
-  // Tambahkan game lain di sini jika diperlukan
-  // console.warn(`accountIdFields tidak terdefinisi untuk slug: ${slug}. Pengguna mungkin tidak dapat memasukkan detail akun.`);
-  return []; // Default ke tanpa field jika slug tidak cocok
-};
-
+// Fungsi getAccountIdFieldsBySlug sudah tidak diperlukan lagi dan akan dihapus.
 
 type Props = {
   params: { gameSlug: string };
@@ -107,11 +87,11 @@ type Props = {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const apiUrl = process.env.BASE_API_URL;
   const lowerCaseGameSlug = params.gameSlug.toLowerCase();
-  let gameName = lowerCaseGameSlug.replace(/-/g, ' '); // Default name from slug
+  let gameName = lowerCaseGameSlug.replace(/-/g, ' '); 
 
   if (apiUrl) {
     try {
-      const res = await fetch(`${apiUrl}/category`, { cache: 'no-store' }); // Ambil data terbaru
+      const res = await fetch(`${apiUrl}/category`, { cache: 'no-store' }); 
       if (res.ok) {
         const apiResponse = await res.json();
         const categories: ApiCategoryItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
@@ -139,7 +119,7 @@ export default async function GamePackagesPage({ params }: Props) {
 
   if (apiUrl) {
     try {
-      const res = await fetch(`${apiUrl}/category`, { cache: 'no-store' }); // Ambil data terbaru
+      const res = await fetch(`${apiUrl}/category`, { cache: 'no-store' }); 
       if (res.ok) {
         const apiResponse = await res.json();
         const categories: ApiCategoryItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
@@ -157,12 +137,8 @@ export default async function GamePackagesPage({ params }: Props) {
     notFound();
   }
 
-  const accountIdFields = getAccountIdFieldsBySlug(gameSlug);
-  // if (accountIdFields.length === 0 && gameFromApi) {
-  //   // Ini adalah tempat yang baik untuk log jika game yang aktif di API kehilangan definisi accountIdFields-nya
-  //   console.warn(`Peringatan: accountIdFields tidak terdefinisi secara lokal untuk game aktif dari API: ${gameFromApi.name} (slug: ${gameSlug}). Formulir input akun mungkin tidak muncul.`);
-  // }
-
+  // Memastikan account_id_field adalah array, default ke array kosong jika tidak ada atau bukan array
+  const accountIdFieldsFromApi = Array.isArray(gameFromApi.account_id_field) ? gameFromApi.account_id_field : [];
 
   const dynamicPackages = await getPackagesForGame(gameFromApi.id, gameSlug);
 
@@ -170,14 +146,14 @@ export default async function GamePackagesPage({ params }: Props) {
   const hintKeywords = nameParts.slice(0, 2).join(' ');
 
   const gameForClient: Game = {
-    id: gameFromApi.code, // Menggunakan code (slug) sebagai id utama game di sisi klien
-    categoryId: gameFromApi.id, // Menyimpan id numerik dari API
+    id: gameFromApi.code, 
+    categoryId: gameFromApi.id, 
     name: gameFromApi.name, 
     slug: gameFromApi.code, 
     imageUrl: gameFromApi.img_logo, 
-    description: `Top up untuk ${gameFromApi.name}. Pilih paket terbaikmu!`, // Deskripsi dinamis
+    description: `Top up untuk ${gameFromApi.name}. Pilih paket terbaikmu!`, 
     packages: dynamicPackages,
-    accountIdFields: accountIdFields, // Dari helper lokal
+    accountIdFields: accountIdFieldsFromApi, // Ambil dari API
     dataAiHint: hintKeywords,
   };
 
