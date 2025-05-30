@@ -19,9 +19,10 @@ import Image from 'next/image';
 
 interface DiamondPackagesClientProps {
   game: Game;
+  apiUrl?: string; // Added apiUrl prop
 }
 
-const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
+const DiamondPackagesClient = ({ game, apiUrl }: DiamondPackagesClientProps) => {
   const router = useRouter();
   const { selectedPackage: contextSelectedPackage, setSelectedGame, setSelectedPackage, setAccountDetails } = usePurchase();
   const [currentSelectedPackage, setCurrentSelectedPackage] = useState<DiamondPackage | null>(null);
@@ -47,8 +48,8 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
   const handleInitiatePurchase = (pkg: DiamondPackage) => {
     setCurrentSelectedPackage(pkg);
     setSelectedPackage(pkg); // Set the package in context here
-    setAccountCheckError(null); 
-    setIsCheckingAccount(false); 
+    setAccountCheckError(null);
+    setIsCheckingAccount(false);
     setAccountDialogOpen(true);
   };
 
@@ -63,7 +64,7 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
     });
     return z.object(schemaFields);
   };
-  
+
   const formSchema = createSchema(game.accountIdFields);
   type FormData = z.infer<typeof formSchema>;
 
@@ -74,14 +75,14 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
       return acc;
     }, {} as Record<string, string>),
   });
-  
+
   useEffect(() => {
     if (isAccountDialogOpen && currentSelectedPackage) {
       form.reset(game.accountIdFields.reduce((acc, field) => {
-        acc[field.name] = ''; 
+        acc[field.name] = '';
         return acc;
       }, {} as Record<string, string>));
-      setAccountCheckError(null); 
+      setAccountCheckError(null);
       setIsCheckingAccount(false);
     }
   }, [isAccountDialogOpen, currentSelectedPackage, form, game.accountIdFields]);
@@ -96,10 +97,8 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
     setIsCheckingAccount(true);
     setAccountCheckError(null);
 
-    const apiUrl = process.env.NEXT_PUBLIC_BASE_API_URL;
-
     if (!apiUrl) {
-      setAccountCheckError("URL API tidak terkonfigurasi. Pastikan variabel NEXT_PUBLIC_BASE_API_URL sudah benar dan server di-restart.");
+      setAccountCheckError("URL API tidak terkonfigurasi. Silakan coba lagi nanti.");
       setIsCheckingAccount(false);
       return;
     }
@@ -130,8 +129,8 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
 
       if (result.error) {
         setAccountCheckError(result.error);
-      } else if (result.username !== undefined) { 
-        setAccountDetails(data); 
+      } else if (result.username !== undefined) {
+        setAccountDetails(data);
         router.push('/confirm');
       } else {
         setAccountCheckError("Format respons tidak dikenal dari server.");
@@ -154,11 +153,11 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
       </div>
 
       <div className="flex flex-col md:flex-row items-center md:items-start gap-4 sm:gap-6 p-4 sm:p-6 bg-card rounded-lg shadow-xl">
-        <Image 
-          src={game.imageUrl} 
-          alt={game.name} 
-          width={150} 
-          height={150} 
+        <Image
+          src={game.imageUrl}
+          alt={game.name}
+          width={150}
+          height={150}
           className="rounded-lg border-2 border-primary object-cover w-[100px] h-[100px] sm:w-[150px] sm:h-[150px]"
           data-ai-hint={game.dataAiHint}
         />
@@ -189,7 +188,7 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
           <p className="text-center text-muted-foreground text-sm sm:text-base">Tidak ada paket diamond yang tersedia untuk {game.name}.</p>
         )}
       </div>
-      
+
       {currentSelectedPackage && (
         <Dialog open={isAccountDialogOpen} onOpenChange={setAccountDialogOpen}>
           <DialogContent className="sm:max-w-[425px] md:max-w-md">
@@ -214,9 +213,9 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
                         <FormItem>
                           <FormLabel className="text-xs sm:text-sm text-primary">{field.label}</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder={field.placeholder} 
-                              {...formField} 
+                            <Input
+                              placeholder={field.placeholder}
+                              {...formField}
                               type={field.type || "text"}
                               className="bg-background border-border focus:ring-primary focus:border-primary text-xs sm:text-sm"
                             />
@@ -227,7 +226,7 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
                     />
                   ))}
                 </div>
-                
+
                 {accountCheckError && (
                   <p className="text-sm text-destructive text-center py-2">{accountCheckError}</p>
                 )}
@@ -236,9 +235,9 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
                   <DialogClose asChild>
                     <Button type="button" variant="outline" size="sm" className="text-xs sm:text-sm">Batal</Button>
                   </DialogClose>
-                  <Button 
-                    type="submit" 
-                    size="sm" 
+                  <Button
+                    type="submit"
+                    size="sm"
                     className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm"
                     disabled={isCheckingAccount}
                   >
@@ -260,4 +259,3 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
 };
 
 export default DiamondPackagesClient;
-    
