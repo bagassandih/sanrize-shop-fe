@@ -14,7 +14,7 @@ import { useForm, type SubmitHandler } from 'react-hook-form';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { AlertCircle, Gem, ShoppingCart, Info, ArrowLeft } from 'lucide-react';
+import { AlertCircle, Gem, ShoppingCart, Info, ArrowLeft, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 
 interface DiamondPackagesClientProps {
@@ -26,43 +26,45 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
   const { selectedPackage: contextSelectedPackage, setSelectedGame, setSelectedPackage, setAccountDetails } = usePurchase();
   const [currentSelectedPackage, setCurrentSelectedPackage] = useState<DiamondPackage | null>(null);
   const [isAccountDialogOpen, setAccountDialogOpen] = useState(false);
+  const [isCheckingAccount, setIsCheckingAccount] = useState(false);
+  const [accountCheckError, setAccountCheckError] = useState<string | null>(null);
+
 
   useEffect(() => {
     setSelectedGame(game);
-    // Initialize currentSelectedPackage from context if available and matches current game packages
     if (contextSelectedPackage && game.packages.some(p => p.id === contextSelectedPackage.id)) {
       setCurrentSelectedPackage(contextSelectedPackage);
     } else {
       setCurrentSelectedPackage(null);
-      // setSelectedPackage(null); // Don't nullify context package here unless explicitly navigating away
     }
   }, [game, setSelectedGame, contextSelectedPackage]);
 
-  // Called when a card is clicked (for visual selection)
   const handlePackageSelect = (pkg: DiamondPackage) => {
     setCurrentSelectedPackage(pkg);
-    setSelectedPackage(pkg); // Also update context immediately for consistency
-    // Do NOT open dialog here
+    setSelectedPackage(pkg);
   };
 
-  // Called when the "Beli" button inside a card is clicked
   const handleInitiatePurchase = (pkg: DiamondPackage) => {
-    // Ensure the correct package is set before opening the dialog
-    setCurrentSelectedPackage(pkg); 
+    setCurrentSelectedPackage(pkg);
     setSelectedPackage(pkg);
-    setAccountDialogOpen(true); 
+    setAccountCheckError(null); // Reset error saat dialog dibuka
+    setIsCheckingAccount(false); // Reset status loading
+    setAccountDialogOpen(true);
   };
 
   const createSchema = (fields: AccountIdField[]) => {
     const schemaFields: Record<string, z.ZodString> = {};
     fields.forEach(field => {
-      schemaFields[field.name] = z.string()
-        .min(1, `${field.label} wajib diisi.`)
-        .regex(field.name === 'userId' || field.name === 'uid' || field.name === 'zoneId' ? /^\d+$/ : /.*/, `${field.label} harus valid.`);
+      let fieldSchema = z.string().min(1, `${field.label} wajib diisi.`);
+      // Tambahkan validasi regex jika ada pattern, misalnya untuk angka saja
+      if (field.name.toLowerCase().includes('id') || field.type === 'number') {
+        fieldSchema = fieldSchema.regex(/^\d+$/, `${field.label} harus berupa angka.`);
+      }
+      schemaFields[field.name] = fieldSchema;
     });
     return z.object(schemaFields);
   };
-
+  
   const formSchema = createSchema(game.accountIdFields);
   type FormData = z.infer<typeof formSchema>;
 
@@ -76,24 +78,70 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
   
   useEffect(() => {
     if (isAccountDialogOpen && currentSelectedPackage) {
-      // Reset form when dialog opens with a selected package
       form.reset(game.accountIdFields.reduce((acc, field) => {
         acc[field.name] = ''; 
         return acc;
       }, {} as Record<string, string>));
+      setAccountCheckError(null); // Reset error saat dialog dibuka/paket berubah
+      setIsCheckingAccount(false);
     }
   }, [isAccountDialogOpen, currentSelectedPackage, form, game.accountIdFields]);
 
 
-  const onSubmit: SubmitHandler<FormData> = (data) => {
-    if (!currentSelectedPackage) {
-      console.error("Paket tidak terpilih saat submit form dialog.");
-      // Potentially show a toast message to the user
+  const onSubmit: SubmitHandler<FormData> = async (data) => {
+    if (!currentSelectedPackage || !game) {
+      setAccountCheckError("Terjadi kesalahan, paket atau game tidak terpilih.");
       return;
     }
-    setAccountDetails(data);
-    setAccountDialogOpen(false);
-    router.push('/confirm');
+
+    setIsCheckingAccount(true);
+    setAccountCheckError(null);
+
+    const payload: { code: string; [key: string]: string } = {
+      code: game.slug,
+      ...data,
+    };
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_BASE_API_URL;
+      if (!apiUrl) {
+        setAccountCheckError("URL API tidak terkonfigurasi dengan benar.");
+        setIsCheckingAccount(false);
+        return;
+      }
+
+      const response = await fetch(`${apiUrl}/check-account`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setAccountCheckError(result.error || `Gagal memeriksa akun (Error: ${response.status})`);
+        setIsCheckingAccount(false);
+        return;
+      }
+
+      if (result.error) {
+        setAccountCheckError(result.error);
+      } else if (result.username) {
+        // Akun berhasil dicek, username diterima
+        setAccountDetails(data); // Simpan detail akun yang diinput pengguna (User ID, Zone ID, dll.)
+        router.push('/confirm');
+        // Dialog akan tertutup otomatis karena navigasi
+      } else {
+        setAccountCheckError("Format respons tidak dikenal dari server.");
+      }
+    } catch (error) {
+      console.error("Error saat memeriksa akun:", error);
+      setAccountCheckError("Tidak dapat terhubung ke server untuk memeriksa akun. Coba lagi nanti.");
+    } finally {
+      setIsCheckingAccount(false);
+    }
   };
 
   return (
@@ -179,13 +227,27 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
                     />
                   ))}
                 </div>
+                
+                {accountCheckError && (
+                  <p className="text-sm text-destructive text-center py-2">{accountCheckError}</p>
+                )}
+
                 <DialogFooter className="mt-4 sm:mt-8">
                   <DialogClose asChild>
                     <Button type="button" variant="outline" size="sm" className="text-xs sm:text-sm">Batal</Button>
                   </DialogClose>
-                  <Button type="submit" size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm">
-                    <ShoppingCart className="mr-2 h-4 w-4" />
-                    Lanjutkan ke Konfirmasi
+                  <Button 
+                    type="submit" 
+                    size="sm" 
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs sm:text-sm"
+                    disabled={isCheckingAccount}
+                  >
+                    {isCheckingAccount ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <ShoppingCart className="mr-2 h-4 w-4" />
+                    )}
+                    {isCheckingAccount ? "Memeriksa..." : "Lanjutkan ke Konfirmasi"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -198,3 +260,4 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
 };
 
 export default DiamondPackagesClient;
+
