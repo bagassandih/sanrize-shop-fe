@@ -73,7 +73,12 @@ const SuccessClient = () => {
                     </div>
                 </div>
                 {accountDetails && Object.entries(accountDetails).map(([key, value]) => {
-                     const fieldLabel = selectedGame.accountIdFields.find(f => f.name === key)?.label || key;
+                     let fieldLabel = key;
+                     if (key === 'username') {
+                       fieldLabel = "Nickname";
+                     } else {
+                       fieldLabel = selectedGame.accountIdFields.find(f => f.name === key)?.label || key;
+                     }
                      return (
                         <div className="flex justify-between" key={key}>
                             <span className="text-muted-foreground">{fieldLabel}:</span>
@@ -97,3 +102,5 @@ const SuccessClient = () => {
 };
 
 export default SuccessClient;
+
+    

@@ -19,7 +19,7 @@ import Image from 'next/image';
 
 interface DiamondPackagesClientProps {
   game: Game;
-  apiUrl?: string; // Added apiUrl prop
+  apiUrl?: string;
 }
 
 const DiamondPackagesClient = ({ game, apiUrl }: DiamondPackagesClientProps) => {
@@ -42,12 +42,11 @@ const DiamondPackagesClient = ({ game, apiUrl }: DiamondPackagesClientProps) => 
 
   const handlePackageSelect = (pkg: DiamondPackage) => {
     setCurrentSelectedPackage(pkg);
-    // setSelectedPackage(pkg); // Package is set on purchase initiation
   };
 
   const handleInitiatePurchase = (pkg: DiamondPackage) => {
     setCurrentSelectedPackage(pkg);
-    setSelectedPackage(pkg); // Set the package in context here
+    setSelectedPackage(pkg);
     setAccountCheckError(null);
     setIsCheckingAccount(false);
     setAccountDialogOpen(true);
@@ -130,7 +129,7 @@ const DiamondPackagesClient = ({ game, apiUrl }: DiamondPackagesClientProps) => 
       if (result.error) {
         setAccountCheckError(result.error);
       } else if (result.username !== undefined) {
-        setAccountDetails(data);
+        setAccountDetails({ ...data, username: result.username }); // Save form data + username
         router.push('/confirm');
       } else {
         setAccountCheckError("Format respons tidak dikenal dari server.");
@@ -259,3 +258,5 @@ const DiamondPackagesClient = ({ game, apiUrl }: DiamondPackagesClientProps) => 
 };
 
 export default DiamondPackagesClient;
+
+    

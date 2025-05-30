@@ -82,13 +82,11 @@ const ConfirmationClient = () => {
           <div>
             <h3 className="text-xs sm:text-base md:text-lg font-semibold text-primary mb-1">Paket Terpilih:</h3>
             <div className="flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 bg-muted/30 rounded-md">
-              {selectedPackage.iconName === "Gem" || selectedPackage.imageUrl ? ( // Check for imageUrl as well
-                 selectedPackage.imageUrl ? (
-                    <Image src={selectedPackage.imageUrl} alt={selectedPackage.name} width={32} height={32} className="h-8 w-8 md:h-10 md:w-10 rounded-sm object-contain" data-ai-hint="package icon"/>
-                 ) : (
-                    <Gem className="h-5 w-5 sm:h-7 sm:w-7 md:h-8 md:w-8 text-accent mt-1" />
-                 )
-              ) : <div className="w-5 h-5 sm:w-7 sm:w-7 md:w-8 md:h-8"></div> /* Placeholder to maintain alignment */}
+              {selectedPackage.imageUrl ? (
+                  <Image src={selectedPackage.imageUrl} alt={selectedPackage.name} width={32} height={32} className="h-8 w-8 md:h-10 md:w-10 rounded-sm object-contain" data-ai-hint="package icon"/>
+              ) : selectedPackage.iconName === "Gem" ? (
+                  <Gem className="h-5 w-5 sm:h-7 sm:w-7 md:h-8 md:w-8 text-accent mt-1" />
+              ) : <div className="w-5 h-5 sm:w-7 sm:w-7 md:w-8 md:h-8"></div> /* Placeholder */}
               <div>
                 <p className="font-medium text-foreground text-xs sm:text-sm md:text-base">{selectedPackage.name}</p>
                 {selectedPackage.bonus && String(selectedPackage.bonus).trim() !== "" && (
@@ -103,7 +101,12 @@ const ConfirmationClient = () => {
             <h3 className="text-xs sm:text-base md:text-lg font-semibold text-primary mb-1">Detail Akun:</h3>
             <ul className="list-disc list-inside space-y-1 pl-2 bg-muted/30 p-2 sm:p-3 rounded-md text-xs sm:text-sm md:text-base">
               {Object.entries(accountDetails).map(([key, value]) => {
-                  const fieldLabel = selectedGame.accountIdFields.find(f => f.name === key)?.label || key;
+                  let fieldLabel = key;
+                  if (key === 'username') {
+                    fieldLabel = "Nickname";
+                  } else {
+                    fieldLabel = selectedGame.accountIdFields.find(f => f.name === key)?.label || key;
+                  }
                   return (
                     <li key={key} className="text-foreground">
                       <span className="font-medium text-muted-foreground">{fieldLabel}: </span>{String(value)}
@@ -144,3 +147,5 @@ const ConfirmationClient = () => {
 };
 
 export default ConfirmationClient;
+
+    
