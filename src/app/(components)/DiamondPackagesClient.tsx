@@ -96,20 +96,22 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
     setIsCheckingAccount(true);
     setAccountCheckError(null);
 
+    const apiUrl = process.env.NEXT_PUBLIC_BASE_API_URL;
+
+    if (!apiUrl) {
+      setAccountCheckError("URL API tidak terkonfigurasi. Pastikan variabel NEXT_PUBLIC_BASE_API_URL sudah benar dan server di-restart.");
+      setIsCheckingAccount(false);
+      return;
+    }
+
+    const checkAccountEndpoint = `${apiUrl}/check-account`;
+
     const payload: { code: string; [key: string]: string } = {
       code: game.slug,
       ...data,
     };
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_BASE_API_URL;
-      if (!apiUrl) {
-        setAccountCheckError("URL API tidak terkonfigurasi dengan benar.");
-        setIsCheckingAccount(false);
-        return;
-      }
-
-      const checkAccountEndpoint = `${apiUrl}/check-account`;
       const response = await fetch(checkAccountEndpoint, {
         method: 'POST',
         headers: {
@@ -128,7 +130,7 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
 
       if (result.error) {
         setAccountCheckError(result.error);
-      } else if (result.username !== undefined) { // Check for username property
+      } else if (result.username !== undefined) { 
         setAccountDetails(data); 
         router.push('/confirm');
       } else {
@@ -258,5 +260,4 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
 };
 
 export default DiamondPackagesClient;
-
     
