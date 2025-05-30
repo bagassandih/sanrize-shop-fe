@@ -41,14 +41,14 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
 
   const handlePackageSelect = (pkg: DiamondPackage) => {
     setCurrentSelectedPackage(pkg);
-    setSelectedPackage(pkg);
+    // setSelectedPackage(pkg); // Package is set on purchase initiation
   };
 
   const handleInitiatePurchase = (pkg: DiamondPackage) => {
     setCurrentSelectedPackage(pkg);
-    setSelectedPackage(pkg);
-    setAccountCheckError(null); // Reset error saat dialog dibuka
-    setIsCheckingAccount(false); // Reset status loading
+    setSelectedPackage(pkg); // Set the package in context here
+    setAccountCheckError(null); 
+    setIsCheckingAccount(false); 
     setAccountDialogOpen(true);
   };
 
@@ -56,9 +56,8 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
     const schemaFields: Record<string, z.ZodString> = {};
     fields.forEach(field => {
       let fieldSchema = z.string().min(1, `${field.label} wajib diisi.`);
-      // Tambahkan validasi regex jika ada pattern, misalnya untuk angka saja
       if (field.name.toLowerCase().includes('id') || field.type === 'number') {
-        fieldSchema = fieldSchema.regex(/^\d+$/, `${field.label} harus berupa angka.`);
+        fieldSchema = fieldSchema.regex(/^\d*$/, `${field.label} harus berupa angka.`);
       }
       schemaFields[field.name] = fieldSchema;
     });
@@ -82,7 +81,7 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
         acc[field.name] = ''; 
         return acc;
       }, {} as Record<string, string>));
-      setAccountCheckError(null); // Reset error saat dialog dibuka/paket berubah
+      setAccountCheckError(null); 
       setIsCheckingAccount(false);
     }
   }, [isAccountDialogOpen, currentSelectedPackage, form, game.accountIdFields]);
@@ -110,7 +109,8 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
         return;
       }
 
-      const response = await fetch(`${apiUrl}/check-account`, {
+      const checkAccountEndpoint = `${apiUrl}/check-account`;
+      const response = await fetch(checkAccountEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -128,11 +128,9 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
 
       if (result.error) {
         setAccountCheckError(result.error);
-      } else if (result.username) {
-        // Akun berhasil dicek, username diterima
-        setAccountDetails(data); // Simpan detail akun yang diinput pengguna (User ID, Zone ID, dll.)
+      } else if (result.username !== undefined) { // Check for username property
+        setAccountDetails(data); 
         router.push('/confirm');
-        // Dialog akan tertutup otomatis karena navigasi
       } else {
         setAccountCheckError("Format respons tidak dikenal dari server.");
       }
@@ -157,8 +155,8 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
         <Image 
           src={game.imageUrl} 
           alt={game.name} 
-          width={120} 
-          height={120} 
+          width={150} 
+          height={150} 
           className="rounded-lg border-2 border-primary object-cover w-[100px] h-[100px] sm:w-[150px] sm:h-[150px]"
           data-ai-hint={game.dataAiHint}
         />
@@ -261,3 +259,4 @@ const DiamondPackagesClient = ({ game }: DiamondPackagesClientProps) => {
 
 export default DiamondPackagesClient;
 
+    
