@@ -6,13 +6,25 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck, Gem, ArrowLeft } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck, Gem, ArrowLeft, Info } from 'lucide-react';
 import Image from 'next/image';
 
-const ConfirmationClient = () => {
+// Declare DOKU's global function for TypeScript
+declare global {
+  interface Window {
+    loadJokulCheckout: (paymentUrl: string) => void;
+  }
+}
+
+interface ConfirmationClientProps {
+  apiUrl?: string;
+}
+
+const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   const router = useRouter();
   const { selectedGame, selectedPackage, accountDetails, resetPurchase } = usePurchase();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!selectedGame || !selectedPackage || !accountDetails) {
@@ -21,11 +33,89 @@ const ConfirmationClient = () => {
   }, [selectedGame, selectedPackage, accountDetails, router]);
 
   const handleConfirmPurchase = async () => {
+    if (!selectedGame || !selectedPackage || !accountDetails || !apiUrl) {
+      setPaymentError("Informasi pembelian tidak lengkap atau URL API tidak tersedia.");
+      setIsProcessing(false);
+      return;
+    }
+
     setIsProcessing(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000)); 
-    setIsProcessing(false);
-    router.push('/success');
+    setPaymentError(null);
+
+    const primaryAccountIdField = selectedGame.accountIdFields[0]?.name;
+    const idGameValue = primaryAccountIdField ? accountDetails[primaryAccountIdField] : undefined;
+
+    if (!idGameValue) {
+      setPaymentError("Detail ID Game utama tidak ditemukan dalam data akun.");
+      setIsProcessing(false);
+      return;
+    }
+    
+    if (!selectedPackage.originalId) {
+      setPaymentError("ID Layanan (originalId) tidak ditemukan untuk paket yang dipilih.");
+      setIsProcessing(false);
+      return;
+    }
+    
+    if (!accountDetails.username) {
+      setPaymentError("Nickname tidak ditemukan. Pastikan akun sudah dicek.");
+      setIsProcessing(false);
+      return;
+    }
+
+    const payload = {
+      idGame: String(idGameValue),
+      idService: selectedPackage.originalId,
+      nickname: accountDetails.username,
+    };
+
+    try {
+      const response = await fetch(`${apiUrl}/process-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setPaymentError(result.error || `Gagal memproses pesanan (Error: ${response.status})`);
+        setIsProcessing(false);
+        return;
+      }
+
+      if (result.error) {
+        setPaymentError(result.error);
+        setIsProcessing(false);
+      } else if (result.payment_url) {
+        if (typeof window.loadJokulCheckout === 'function') {
+          window.loadJokulCheckout(result.payment_url);
+          // Asumsi DOKU popup mengambil alih. Navigasi ke sukses setelah DOKU selesai
+          // Untuk saat ini, kita navigasi setelah memanggil popup.
+          // Idealnya, ada callback sukses dari DOKU.
+          // Setelah memanggil DOKU, bisa saja pengguna menutup popup, jadi state sukses bisa jadi prematur.
+          // Untuk simplisitas sementara:
+          setTimeout(() => {
+             // Navigasi ke sukses mungkin perlu dipikirkan ulang tergantung flow DOKU.
+             // Jika DOKU melakukan redirect sendiri, maka baris ini tidak perlu.
+             // Jika tidak, kita mungkin perlu halaman perantara atau cara lain untuk konfirmasi.
+             // Untuk sekarang, kita asumsikan setelah panggil, proses lanjut ke halaman sukses.
+             router.push('/success');
+          }, 1000); // Beri sedikit waktu agar popup DOKU sempat termuat
+        } else {
+          setPaymentError("Fungsi pembayaran DOKU tidak ditemukan. Pastikan skrip telah dimuat.");
+        }
+      } else {
+        setPaymentError("Format respons tidak dikenal dari server setelah memproses pesanan.");
+      }
+    } catch (error) {
+      console.error("Error saat memproses pesanan:", error);
+      setPaymentError("Tidak dapat terhubung ke server untuk memproses pesanan. Coba lagi nanti.");
+    } finally {
+      // setIsProcessing(false); // Dibiarkan true jika DOKU popup yang menghandle
+    }
   };
   
   const formatPriceIDR = (price: number) => {
@@ -102,10 +192,10 @@ const ConfirmationClient = () => {
             <ul className="list-disc list-inside space-y-1 pl-2 bg-muted/30 p-2 sm:p-3 rounded-md text-xs sm:text-sm md:text-base">
               {Object.entries(accountDetails).map(([key, value]) => {
                   let fieldLabel = key;
-                  if (key === 'username') {
+                  if (key.toLowerCase() === 'username') {
                     fieldLabel = "Nickname";
                   } else {
-                    fieldLabel = selectedGame.accountIdFields.find(f => f.name === key)?.label || key;
+                    fieldLabel = selectedGame.accountIdFields.find(f => f.name === key)?.label || key.charAt(0).toUpperCase() + key.slice(1);
                   }
                   return (
                     <li key={key} className="text-foreground">
@@ -123,6 +213,12 @@ const ConfirmationClient = () => {
           </div>
         </CardContent>
       </Card>
+
+      {paymentError && (
+        <div className="p-3 bg-destructive/20 border border-destructive text-destructive rounded-md text-center text-sm">
+          <Info className="inline-block mr-2 h-4 w-4" /> {paymentError}
+        </div>
+      )}
 
       <Button 
         onClick={handleConfirmPurchase} 
@@ -147,5 +243,3 @@ const ConfirmationClient = () => {
 };
 
 export default ConfirmationClient;
-
-    

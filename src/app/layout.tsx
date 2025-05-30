@@ -31,6 +31,8 @@ export default function RootLayout({
     // Ensure no leading/trailing whitespace around <html> or <body> tags
     <html lang="id" className="dark">
       <head>
+        {/* DOKU Checkout Script - For Sandbox */}
+        <script src="https://sandbox.doku.com/jokul-checkout-js/v1/jokul-checkout-1.0.0.js" async></script>
         {/* Next.js automatically populates head based on metadata and font imports.
             This explicit <head> tag helps ensure proper structure and avoid hydration errors. */}
       </head>

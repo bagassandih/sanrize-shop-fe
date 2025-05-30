@@ -1,5 +1,5 @@
 
-import { type Game, type DiamondPackage, type AccountIdField } from '@/lib/data';
+import type { Game, DiamondPackage, AccountIdField } from '@/lib/data';
 import DiamondPackagesClient from '@/app/(components)/DiamondPackagesClient';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -64,12 +64,14 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
     return serviceItems
       .filter(item => item.status === 'available')
       .map((item): DiamondPackage => ({
-        id: `${gameSlug}_${item.id}`, // Ensure unique package ID, e.g., by prefixing with game slug
+        id: `${gameSlug}_${item.id}`, // Frontend unique ID
+        originalId: item.id, // Original service ID from API
         name: item.name,
         price: item.price,
         bonus: item.bonus && String(item.bonus).trim() !== "" && String(item.bonus).toLowerCase() !== "0" && String(item.bonus).toLowerCase() !== "null" ? String(item.bonus) : undefined,
         imageUrl: item.img && item.img.trim() !== "" ? item.img : undefined,
         iconName: (!item.img || item.img.trim() === "") ? 'Gem' : undefined,
+        diamonds: undefined, // Can be parsed if needed, but name usually contains it
       }));
   } catch (error) {
     console.error(`Error fetching packages for category ${categoryId}:`, error);
@@ -82,7 +84,7 @@ type Props = {
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const currentApiUrl = process.env.BASE_API_URL; // Use a different name to avoid conflict
+  const currentApiUrl = process.env.BASE_API_URL;
   const lowerCaseGameSlug = params.gameSlug.toLowerCase();
   let gameName = lowerCaseGameSlug.replace(/-/g, ' ');
 
@@ -102,15 +104,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   }
 
+  const capitalizedGameName = gameName
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+
   return {
-    title: `Paket Diamond ${gameName} - Sanrize Shop`,
-    description: `Beli diamond ${gameName} dan mata uang dalam game. Top-up cepat dan aman di Sanrize Shop.`,
+    title: `Paket Diamond ${capitalizedGameName} - Sanrize Shop`,
+    description: `Beli diamond untuk ${capitalizedGameName}. Top-up cepat dan aman di Sanrize Shop.`,
   };
 }
 
 export default async function GamePackagesPage({ params }: Props) {
   const gameSlug = params.gameSlug.toLowerCase();
-  const baseApiUrl = process.env.BASE_API_URL; // Read the env variable here
+  const baseApiUrl = process.env.BASE_API_URL; 
 
   let gameFromApi: ApiCategoryItem | undefined;
 
@@ -130,11 +137,15 @@ export default async function GamePackagesPage({ params }: Props) {
   }
 
   if (!gameFromApi) {
-    console.error(`Game dengan slug '${gameSlug}' tidak ditemukan di API atau API tidak dapat dijangkau, atau status tidak aktif.`);
+    console.warn(`Game dengan slug '${gameSlug}' tidak ditemukan di API atau API tidak dapat dijangkau, atau status tidak aktif.`);
     notFound();
   }
 
   const accountIdFieldsFromApi = Array.isArray(gameFromApi.account_id_field) ? gameFromApi.account_id_field : [];
+  if (accountIdFieldsFromApi.length === 0) {
+      console.warn(`Tidak ada account_id_field yang terdefinisi untuk game ${gameSlug} dari API.`);
+  }
+
   const dynamicPackages = await getPackagesForGame(gameFromApi.id, gameSlug);
 
   const nameParts = gameFromApi.name.toLowerCase().split(/\s+/);

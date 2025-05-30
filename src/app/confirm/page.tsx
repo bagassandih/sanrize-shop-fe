@@ -8,7 +8,8 @@ export const metadata: Metadata = {
 };
 
 export default function ConfirmationPage() {
+  const apiUrl = process.env.BASE_API_URL;
   return (
-    <ConfirmationClient />
+    <ConfirmationClient apiUrl={apiUrl} />
   );
 }

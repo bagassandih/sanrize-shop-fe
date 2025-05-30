@@ -2,7 +2,8 @@
 import type { LucideIcon } from 'lucide-react';
 
 export interface DiamondPackage {
-  id: string;
+  id: string; // Frontend unique ID (e.g., gameSlug_originalId)
+  originalId: number; // Original ID from the API service, used for processing order
   name: string;
   diamonds?: number;
   price: number; // Harga dalam IDR
@@ -31,15 +32,9 @@ export interface Game {
 }
 
 export const parseDiamondsFromName = (name: string): number | undefined => {
-  // accountIdFields: [
-  //   { label: "ID Pengguna", name: "userId", placeholder: "Masukkan ID Pengguna", type: "text" },
-  //   { label: "ID Zona", name: "zoneId", placeholder: "Masukkan ID Zona (cth: 1234)", type: "text" },
-  // ],
-  
   const match = name.match(/(\d+)\s*Diamonds/i) || name.match(/(\d+)\s*Points/i) || name.match(/(\d+)\s*VP/i);
   if (match && match[1]) {
     return parseInt(match[1], 10);
   }
   return undefined;
 };
-
