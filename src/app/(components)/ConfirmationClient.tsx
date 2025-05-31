@@ -6,18 +6,24 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck, Gem, ArrowLeft, Info } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck, Gem, ArrowLeft, Info, PartyPopper } from 'lucide-react';
 import Image from 'next/image';
 
 interface ConfirmationClientProps {
   apiUrl?: string;
 }
 
+interface FeedbackMessage {
+  type: 'success' | 'error' | 'info';
+  text: string;
+}
+
 const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   const router = useRouter();
   const { selectedGame, selectedPackage, accountDetails, resetPurchase } = usePurchase();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<FeedbackMessage | null>(null);
+  const [showSuccessRedirectMessage, setShowSuccessRedirectMessage] = useState(false);
 
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const paymentWindowRef = useRef<Window | null>(null);
@@ -31,10 +37,11 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
-      if (paymentWindowRef.current && !paymentWindowRef.current.closed) {
-        // paymentWindowRef.current.close(); // Avoid closing if component unmounts for other reasons while DOKU is active
-        // paymentWindowRef.current = null;
-      }
+      // It's generally better not to close the DOKU window on unmount
+      // if the user might still be interacting with it.
+      // if (paymentWindowRef.current && !paymentWindowRef.current.closed) {
+      //   paymentWindowRef.current.close();
+      // }
     };
   }, [selectedGame, selectedPackage, accountDetails, router]);
 
@@ -47,7 +54,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     const checkStatus = async () => {
         if (!openedWindow) {
             if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-            setPaymentError("Referensi jendela pembayaran hilang.");
+            setFeedbackMessage({ type: 'error', text: "Referensi jendela pembayaran hilang."});
             setIsProcessing(false);
             return;
         }
@@ -55,17 +62,16 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         if (!apiUrl) {
             console.error("API URL not configured for polling.");
             if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-            setPaymentError("Konfigurasi API bermasalah untuk memeriksa status.");
+            setFeedbackMessage({ type: 'error', text: "Konfigurasi API bermasalah untuk memeriksa status."});
             setIsProcessing(false);
             return;
         }
 
-        // Important: Check if window is closed *before* API call
         if (openedWindow.closed) {
-            const currentError = paymentError; 
             if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-            if (!currentError || !['SUCCESS', 'EXPIRED', 'FAILED', 'CANCELLED'].some(s => (currentError||"").toLowerCase().includes(s.toLowerCase()))) {
-                 setPaymentError("Jendela pembayaran ditutup. Status transaksi mungkin belum final atau dibatalkan.");
+            // Only set error if no success/definitive failure message is already shown
+            if (!feedbackMessage || !['SUCCESS', 'EXPIRED', 'FAILED', 'CANCELLED'].some(s => (feedbackMessage.text).toLowerCase().includes(s.toLowerCase()))) {
+                setFeedbackMessage({ type: 'info', text: "Jendela pembayaran ditutup. Status transaksi mungkin belum final atau dibatalkan."});
             }
             setIsProcessing(false);
             return;
@@ -78,23 +84,21 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
               body: JSON.stringify({ refId: refIdToCheck }),
             });
 
-            // Check if window was closed *during or immediately after* the API call
             if (openedWindow.closed) {
-                 let isSuccessStatus = false;
+                let isSuccessStatus = false;
                  if(response.ok) {
                     try {
                         const tempData = await response.clone().json();
-                        if (tempData.status === 'SUCCESS') {
+                        if (tempData.transaction && tempData.transaction.status === 'SUCCESS') {
                             isSuccessStatus = true;
                         }
                     } catch (e) { /* ignore clone/json parse error here */ }
                  }
 
-                if (!isSuccessStatus) { 
+                if (!isSuccessStatus) {
                     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-                    const currentErr = paymentError;
-                    if (!currentErr || !['SUCCESS', 'EXPIRED', 'FAILED', 'CANCELLED'].some(s => (currentErr||"").toLowerCase().includes(s.toLowerCase()))) {
-                        setPaymentError("Jendela pembayaran ditutup sebelum transaksi selesai atau saat terjadi masalah.");
+                    if (!feedbackMessage || !['SUCCESS', 'EXPIRED', 'FAILED', 'CANCELLED'].some(s => (feedbackMessage.text).toLowerCase().includes(s.toLowerCase()))) {
+                        setFeedbackMessage({ type: 'error', text: "Jendela pembayaran ditutup sebelum transaksi selesai atau saat terjadi masalah."});
                     }
                     setIsProcessing(false);
                     return;
@@ -118,91 +122,110 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                     }
                 }
                 
-                if (openedWindow && !openedWindow.closed) { // Window is OPEN
-                    console.warn(`HTTP ${response.status} error during /check-transaction, but DOKU window is open. Continuing poll. Error: ${detailedErrorMessage}`);
-                    // Don't set UI error, don't stop processing, just continue polling.
-                } else { // Window is CLOSED (or somehow null) AND we got an HTTP error.
+                if (!openedWindow.closed) { 
+                    console.warn(`HTTP ${response.status} error during /check-transaction, DOKU window open. Error: ${detailedErrorMessage}. Polling continues.`);
+                } else { 
                     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-                    const currentErr = paymentError;
-                     if (!currentErr || !['SUCCESS', 'EXPIRED', 'FAILED', 'CANCELLED'].some(s => (currentErr||"").toLowerCase().includes(s.toLowerCase()))) {
-                        setPaymentError(detailedErrorMessage); // Show the specific HTTP error
+                     if (!feedbackMessage || !['SUCCESS', 'EXPIRED', 'FAILED', 'CANCELLED'].some(s => (feedbackMessage.text).toLowerCase().includes(s.toLowerCase()))) {
+                        setFeedbackMessage({ type: 'error', text: detailedErrorMessage});
                     }
                     setIsProcessing(false);
                 }
-                return; // Continue to next poll iteration or stop if interval cleared
+                return;
             }
             
             const data = await response.json();
 
-            if (data.status === 'SUCCESS') { 
+            if (!data.transaction || !data.transaction.status) {
+                console.warn("Format respons /check-transaction tidak valid. 'transaction.status' tidak ditemukan. Respons:", data);
+                if (!openedWindow.closed) {
+                    // Keep polling if window is open and format is unknown
+                } else {
+                    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                    setFeedbackMessage({ type: 'error', text: "Format respons status transaksi tidak dikenal."});
+                    setIsProcessing(false);
+                }
+                return;
+            }
+
+            const transactionStatus = data.transaction.status;
+
+            if (transactionStatus === 'SUCCESS') { 
                 if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                 if (openedWindow && !openedWindow.closed) openedWindow.close();
-                router.push('/success');
-                // setIsProcessing(false); // Let navigation handle this
-            } else if (['EXPIRED', 'FAILED', 'CANCELLED'].includes(data.status)) { 
-                if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-                if (openedWindow && !openedWindow.closed) openedWindow.close();
-                setPaymentError(data.message || `Pembayaran ${data.status.toLowerCase()}.`);
+                setFeedbackMessage({ type: 'success', text: `Pembayaran berhasil! ID Transaksi: ${data.transaction.original_request_id || refIdToCheck}. Anda akan diarahkan...`});
                 setIsProcessing(false);
-            } else if (data.status === 'PENDING') {
+                setShowSuccessRedirectMessage(true);
+                setTimeout(() => {
+                  router.push('/success');
+                }, 4000);
+            } else if (['EXPIRED', 'FAILED', 'CANCELLED'].includes(transactionStatus)) { 
+                if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                if (openedWindow && !openedWindow.closed) openedWindow.close();
+                setFeedbackMessage({ type: 'error', text: `Pembayaran ${transactionStatus.toLowerCase()}. ID Transaksi: ${data.transaction.original_request_id || refIdToCheck}. Silakan coba lagi atau hubungi dukungan.`});
+                setIsProcessing(false);
+            } else if (transactionStatus === 'PENDING') {
                 console.log('Payment pending, continuing to poll...');
-            } else { // Unknown DOKU status from a successful API call
-                console.warn("Unknown transaction status from API:", data.status, " - Message:", data.message);
-                // If window is still open, polling continues. If closed, earlier checks handle it.
+            } else { 
+                console.warn("Unknown transaction status from API:", transactionStatus, " - Full Response:", data);
+                 if (openedWindow && openedWindow.closed) {
+                    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                    setFeedbackMessage({ type: 'info', text: "Status transaksi tidak diketahui dan jendela pembayaran telah ditutup."});
+                    setIsProcessing(false);
+                 }
             }
         } catch (error: any) { 
             console.error("Error during polling (checkStatus catch block):", error);
             
             if (openedWindow && openedWindow.closed) {
                 if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-                setPaymentError("Jendela pembayaran ditutup atau terjadi masalah jaringan saat pemeriksaan status.");
+                if (!feedbackMessage || !['SUCCESS', 'EXPIRED', 'FAILED', 'CANCELLED'].some(s => (feedbackMessage.text).toLowerCase().includes(s.toLowerCase()))) {
+                    setFeedbackMessage({ type: 'error', text: "Jendela pembayaran ditutup atau terjadi masalah jaringan saat pemeriksaan status."});
+                }
                 setIsProcessing(false);
             } else if (!navigator.onLine) {
                  if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-                 setPaymentError("Tidak ada koneksi internet. Periksa jaringan Anda.");
+                 setFeedbackMessage({ type: 'error', text: "Tidak ada koneksi internet. Periksa jaringan Anda."});
                  setIsProcessing(false);
             } else {
-              // For other catch errors (e.g. fetch promise rejected), if window is open, let's not stop polling immediately
-              // unless it's a persistent issue. For now, log it and let it retry.
               console.warn(`Network or other technical issue during polling, DOKU window open. Error: ${error.message || 'Error tidak diketahui'}. Polling continues.`);
-              // If this becomes too noisy or problematic, we might need to add a retry limit here.
-              // For now, don't setPaymentError or setIsProcessing(false) if window is open.
             }
         }
     };
 
     pollingIntervalRef.current = setInterval(checkStatus, 3000);
-    setTimeout(checkStatus, 1000); 
-  }, [apiUrl, router, setIsProcessing, setPaymentError, paymentError]);
+    setTimeout(checkStatus, 1000); // Initial check sooner
+  }, [apiUrl, router, setIsProcessing, setFeedbackMessage, feedbackMessage]);
 
 
   const handleConfirmPurchase = async () => {
     if (!selectedGame || !selectedPackage || !accountDetails || !apiUrl) {
-      setPaymentError("Informasi pembelian tidak lengkap atau URL API tidak tersedia.");
+      setFeedbackMessage({ type: 'error', text: "Informasi pembelian tidak lengkap atau URL API tidak tersedia."});
       setIsProcessing(false);
       return;
     }
 
     setIsProcessing(true);
-    setPaymentError(null);
+    setFeedbackMessage(null);
+    setShowSuccessRedirectMessage(false);
 
     const primaryAccountIdField = selectedGame.accountIdFields[0]?.name;
     const idGameValue = primaryAccountIdField ? accountDetails[primaryAccountIdField] : undefined;
 
     if (!idGameValue) {
-      setPaymentError("Detail ID Game utama tidak ditemukan dalam data akun.");
+      setFeedbackMessage({ type: 'error', text: "Detail ID Game utama tidak ditemukan dalam data akun."});
       setIsProcessing(false);
       return;
     }
     
     if (selectedPackage.originalId === undefined) { 
-      setPaymentError("ID Layanan (originalId) tidak ditemukan untuk paket yang dipilih.");
+      setFeedbackMessage({ type: 'error', text: "ID Layanan (originalId) tidak ditemukan untuk paket yang dipilih."});
       setIsProcessing(false);
       return;
     }
     
     if (!accountDetails.username) {
-      setPaymentError("Nickname tidak ditemukan. Pastikan akun sudah dicek.");
+      setFeedbackMessage({ type: 'error', text: "Nickname tidak ditemukan. Pastikan akun sudah dicek."});
       setIsProcessing(false);
       return;
     }
@@ -223,40 +246,42 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       const result = await response.json();
 
       if (!response.ok) {
-        setPaymentError(result.error || result.message || `Gagal memproses pesanan (Error: ${response.status})`);
+        setFeedbackMessage({ type: 'error', text: result.error || result.message || `Gagal memproses pesanan (Error: ${response.status})`});
         setIsProcessing(false);
         return;
       }
 
       if (result.error || (result.message && response.status !== 200 && response.status !== 201 && !result.payment_url)) {
-        setPaymentError(result.error || result.message);
+        setFeedbackMessage({ type: 'error', text: result.error || result.message });
         setIsProcessing(false);
       } else if (result.payment_url && result.ref_id) {
         const { payment_url, ref_id } = result;
         
         if (paymentWindowRef.current && !paymentWindowRef.current.closed) {
-            setPaymentError("Jendela pembayaran sebelumnya masih terbuka. Harap selesaikan atau tutup terlebih dahulu.");
+            setFeedbackMessage({ type: 'info', text: "Jendela pembayaran sebelumnya masih terbuka. Harap selesaikan atau tutup terlebih dahulu."});
             setIsProcessing(false); 
             return;
         }
         
-        const newWindow: Window | null = window.open(payment_url, "_blank", "width=800,height=700,scrollbars=yes,resizable=yes");
+        const newWindowWidth = 800;
+        const newWindowHeight = 700;
+        const newWindow: Window | null = window.open(payment_url, "_blank", `width=${newWindowWidth},height=${newWindowHeight},scrollbars=yes,resizable=yes,left=${(screen.width - newWindowWidth) / 2},top=${(screen.height - newWindowHeight) / 2}`);
         
         if (newWindow) {
           paymentWindowRef.current = newWindow;
           newWindow.focus(); 
           startPolling(ref_id, newWindow);
         } else {
-          setPaymentError("Gagal membuka jendela pembayaran. Pastikan popup tidak diblokir dan coba lagi.");
+          setFeedbackMessage({ type: 'error', text: "Gagal membuka jendela pembayaran. Pastikan popup tidak diblokir dan coba lagi."});
           setIsProcessing(false);
         }
       } else {
-        setPaymentError("Format respons tidak dikenal dari server setelah memproses pesanan.");
+        setFeedbackMessage({ type: 'error', text: "Format respons tidak dikenal dari server setelah memproses pesanan."});
         setIsProcessing(false);
       }
     } catch (error) {
       console.error("Error saat memproses pesanan:", error);
-      setPaymentError("Tidak dapat terhubung ke server untuk memproses pesanan. Coba lagi nanti.");
+      setFeedbackMessage({ type: 'error', text: "Tidak dapat terhubung ke server untuk memproses pesanan. Coba lagi nanti."});
       setIsProcessing(false);
     }
   };
@@ -284,7 +309,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   return (
     <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8 p-2">
       <div className="mb-4">
-        <Button variant="outline" onClick={() => { if (!isProcessing) router.back(); }} size="sm" className="text-xs sm:text-sm" disabled={isProcessing}>
+        <Button variant="outline" onClick={() => { if (!isProcessing && !showSuccessRedirectMessage) router.back(); }} size="sm" className="text-xs sm:text-sm" disabled={isProcessing || showSuccessRedirectMessage}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Kembali
         </Button>
@@ -357,15 +382,24 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         </CardContent>
       </Card>
 
-      {paymentError && (
-        <div className="p-3 bg-destructive/20 border border-destructive text-destructive rounded-md text-center text-sm">
-          <Info className="inline-block mr-2 h-4 w-4" /> {paymentError}
+      {feedbackMessage && (
+        <div 
+          className={`p-3 border rounded-md text-center text-sm
+            ${feedbackMessage.type === 'success' ? 'bg-green-500/20 border-green-500 text-green-700 dark:text-green-400' : ''}
+            ${feedbackMessage.type === 'error' ? 'bg-destructive/20 border-destructive text-destructive' : ''}
+            ${feedbackMessage.type === 'info' ? 'bg-blue-500/20 border-blue-500 text-blue-700 dark:text-blue-400' : ''}
+          `}
+        >
+          {feedbackMessage.type === 'success' && <PartyPopper className="inline-block mr-2 h-4 w-4" />}
+          {feedbackMessage.type === 'error' && <Info className="inline-block mr-2 h-4 w-4" />}
+          {feedbackMessage.type === 'info' && <Info className="inline-block mr-2 h-4 w-4" />}
+          {feedbackMessage.text}
         </div>
       )}
 
       <Button 
         onClick={handleConfirmPurchase} 
-        disabled={isProcessing}
+        disabled={isProcessing || showSuccessRedirectMessage}
         size="lg"
         className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm sm:text-base"
       >
@@ -374,7 +408,13 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
             <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
             Menunggu Pembayaran...
           </>
-        ) : (
+        ) : showSuccessRedirectMessage ? (
+          <>
+            <CheckCircle2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+            Pembayaran Sukses, Mengarahkan...
+          </>
+        )
+        : (
           <>
             <CheckCircle2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
             Konfirmasi & Bayar
