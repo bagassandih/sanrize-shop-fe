@@ -5,28 +5,28 @@ import { usePurchase } from '@/app/(store)/PurchaseContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck, Gem, ArrowLeft, Info } from 'lucide-react';
 import Image from 'next/image';
 
-// Declare DOKU's global function for TypeScript
-declare global {
-  interface Window {
-    loadJokulCheckout: (paymentUrl: string, options?: JokulCheckoutOptions) => void;
-  }
-}
+// loadJokulCheckout is no longer used
+// declare global {
+//   interface Window {
+//     loadJokulCheckout: (paymentUrl: string, options?: JokulCheckoutOptions) => void;
+//   }
+// }
 
-interface JokulCheckoutOptions {
-  cancelRedirectUrl?: string;
-  continueRedirectUrl?: string;
-  failedRedirectUrl?: string;
-  onClose?: () => void;
-  onLoad?: () => void;
-  onCancel?: () => void;
-  onContinueSuccess?: () => void;
-  onContinueFailed?: () => void;
-  onError?: (data: any) => void;
-}
+// interface JokulCheckoutOptions {
+//   cancelRedirectUrl?: string;
+//   continueRedirectUrl?: string;
+//   failedRedirectUrl?: string;
+//   onClose?: () => void;
+//   onLoad?: () => void;
+//   onCancel?: () => void;
+//   onContinueSuccess?: () => void;
+//   onContinueFailed?: () => void;
+//   onError?: (data: any) => void;
+// }
 
 interface ConfirmationClientProps {
   apiUrl?: string;
@@ -38,11 +38,97 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const paymentWindowRef = useRef<Window | null>(null);
+
   useEffect(() => {
     if (!selectedGame || !selectedPackage || !accountDetails) {
       router.replace('/');
     }
+    // Cleanup polling interval on component unmount
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
   }, [selectedGame, selectedPackage, accountDetails, router]);
+
+
+  const startPolling = useCallback((refIdToCheck: string, openedWindow: Window | null) => {
+    if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+    }
+
+    const checkStatus = async () => {
+        if (!apiUrl) {
+            console.error("API URL not configured for polling.");
+            if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+            setIsProcessing(false);
+            setPaymentError("Konfigurasi API bermasalah untuk memeriksa status.");
+            if (openedWindow && !openedWindow.closed) openedWindow.close();
+            return;
+        }
+
+        try {
+            const response = await fetch(`${apiUrl}/check-transaction?refId=${refIdToCheck}`);
+            if (!response.ok) {
+                console.error(`Error checking transaction status: ${response.status}`);
+                // Consider stopping polling after N errors or for specific HTTP errors
+                // For now, let it continue or be handled by status codes if API returns structured error for 4xx/5xx
+                if (response.status === 404) { // Example: if 404 means transaction not found yet
+                    if (openedWindow && openedWindow.closed) {
+                        if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                        setPaymentError("Jendela pembayaran ditutup atau transaksi tidak ditemukan.");
+                        setIsProcessing(false);
+                    }
+                }
+                return;
+            }
+            const data = await response.json();
+
+            if (data.status === 'PAID' || data.status === 'SUCCESS') { 
+                if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                if (openedWindow && !openedWindow.closed) {
+                    openedWindow.close();
+                }
+                router.push('/success');
+                setIsProcessing(false);
+                setPaymentError(null);
+            } else if (['FAILED', 'CANCELLED', 'EXPIRED'].includes(data.status)) { 
+                if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                if (openedWindow && !openedWindow.closed) {
+                    openedWindow.close();
+                }
+                setPaymentError(data.message || "Pembayaran gagal, dibatalkan, atau kedaluwarsa.");
+                setIsProcessing(false);
+            } else if (data.status === 'PENDING') {
+                console.log('Payment pending, continuing to poll...');
+                if (openedWindow && openedWindow.closed) {
+                    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                    setPaymentError("Jendela pembayaran ditutup sebelum selesai.");
+                    setIsProcessing(false);
+                }
+            } else {
+                console.warn("Unknown transaction status:", data.status, " - Message:", data.message);
+                // Optionally stop polling for unknown statuses if they are persistent
+            }
+        } catch (error) {
+            console.error("Error during polling checkTransactionStatus:", error);
+            // Don't stop polling for network errors, could be temporary.
+            // If the payment window is closed by user, this might also cause issues if not handled.
+            if (openedWindow && openedWindow.closed) {
+                if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                setPaymentError("Jendela pembayaran ditutup atau terjadi masalah jaringan.");
+                setIsProcessing(false);
+            }
+        }
+    };
+
+    pollingIntervalRef.current = setInterval(checkStatus, 3000);
+    checkStatus(); // Initial check
+
+  }, [apiUrl, router, setIsProcessing, setPaymentError]);
+
 
   const handleConfirmPurchase = async () => {
     if (!selectedGame || !selectedPackage || !accountDetails || !apiUrl) {
@@ -63,7 +149,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       return;
     }
     
-    if (!selectedPackage.originalId) {
+    if (selectedPackage.originalId === undefined) { // Check for undefined explicitly
       setPaymentError("ID Layanan (originalId) tidak ditemukan untuk paket yang dipilih.");
       setIsProcessing(false);
       return;
@@ -101,36 +187,17 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       if (result.error) {
         setPaymentError(result.error);
         setIsProcessing(false);
-      } else if (result.payment_url) {
-        if (typeof window.loadJokulCheckout === 'function') {
-          window.loadJokulCheckout(result.payment_url, {
-            onContinueSuccess: () => {
-              // Navigate to success page only when DOKU confirms success and user clicks continue
-              router.push('/success');
-            },
-            onCancel: () => {
-              setPaymentError("Pembayaran dibatalkan oleh pengguna.");
-              setIsProcessing(false);
-            },
-            onClose: () => {
-              // User closed the DOKU popup without completing or explicitly cancelling
-              // Decide if an error message is needed or just reset processing state
-              setPaymentError("Jendela pembayaran ditutup.");
-              setIsProcessing(false);
-            },
-            onError: (dokuError: any) => {
-              console.error("DOKU Checkout Error:", dokuError);
-              setPaymentError("Terjadi kesalahan pada proses pembayaran DOKU. Silakan coba lagi.");
-              setIsProcessing(false);
-            },
-            onLoad: () => {
-              // DOKU Checkout page has loaded, isProcessing should remain true
-            }
-          });
-          // No automatic navigation here, DOKU callbacks will handle it.
-          // isProcessing remains true while DOKU popup is active.
+      } else if (result.payment_url && result.ref_id) {
+        const { payment_url, ref_id } = result;
+        // Open DOKU payment page in a new window/tab
+        const newWindow = window.open(payment_url, "_blank", "width=800,height=700,scrollbars=yes,resizable=yes");
+        
+        if (newWindow) {
+          paymentWindowRef.current = newWindow;
+          startPolling(ref_id, newWindow);
+          // isProcessing remains true while polling
         } else {
-          setPaymentError("Fungsi pembayaran DOKU tidak ditemukan. Pastikan skrip telah dimuat.");
+          setPaymentError("Gagal membuka jendela pembayaran. Pastikan popup tidak diblokir dan coba lagi.");
           setIsProcessing(false);
         }
       } else {
@@ -142,7 +209,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       setPaymentError("Tidak dapat terhubung ke server untuk memproses pesanan. Coba lagi nanti.");
       setIsProcessing(false);
     }
-    // No finally block to set isProcessing to false if DOKU is launched, as DOKU callbacks manage it.
   };
   
   const formatPriceIDR = (price: number) => {
@@ -168,7 +234,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   return (
     <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8 p-2">
       <div className="mb-4">
-        <Button variant="outline" onClick={() => router.back()} size="sm" className="text-xs sm:text-sm">
+        <Button variant="outline" onClick={() => router.back()} size="sm" className="text-xs sm:text-sm" disabled={isProcessing}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Kembali
         </Button>
@@ -256,7 +322,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         {isProcessing ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-            Memproses Pembayaran...
+            Menunggu Pembayaran...
           </>
         ) : (
           <>
