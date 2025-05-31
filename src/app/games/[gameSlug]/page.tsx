@@ -83,7 +83,10 @@ type Props = {
   params: { gameSlug: string };
 };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params: routeParams }: Props): Promise<Metadata> {
+  // Addressing the error "params should be awaited"
+  const params = await routeParams;
+
   const currentApiUrl = process.env.BASE_API_URL;
   const lowerCaseGameSlug = params.gameSlug.toLowerCase();
   let gameName = lowerCaseGameSlug.replace(/-/g, ' ');
@@ -131,7 +134,7 @@ export default async function GamePackagesPage({ params }: Props) {
       } else {
         console.error(`Gagal mengambil data kategori dari API: ${res.status}. Slug: ${gameSlug}`);
       }
-    } catch (error) {
+    } catch (error)
       console.error(`Error mengambil data kategori dari API untuk slug ${gameSlug}:`, error);
     }
   }
