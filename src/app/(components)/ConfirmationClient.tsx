@@ -37,11 +37,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
-      // It's generally better not to close the DOKU window on unmount
-      // if the user might still be interacting with it.
-      // if (paymentWindowRef.current && !paymentWindowRef.current.closed) {
-      //   paymentWindowRef.current.close();
-      // }
     };
   }, [selectedGame, selectedPackage, accountDetails, router]);
 
@@ -69,7 +64,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 
         if (openedWindow.closed) {
             if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-            // Only set error if no success/definitive failure message is already shown
             if (!feedbackMessage || !['SUCCESS', 'EXPIRED', 'FAILED', 'CANCELLED'].some(s => (feedbackMessage.text).toLowerCase().includes(s.toLowerCase()))) {
                 setFeedbackMessage({ type: 'info', text: "Jendela pembayaran ditutup. Status transaksi mungkin belum final atau dibatalkan."});
             }
@@ -153,7 +147,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
             if (transactionStatus === 'SUCCESS') { 
                 if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                 if (openedWindow && !openedWindow.closed) openedWindow.close();
-                setFeedbackMessage({ type: 'success', text: `Pembayaran berhasil! ID Transaksi: ${data.transaction.original_request_id || refIdToCheck}. Anda akan diarahkan...`});
+                setFeedbackMessage({ type: 'success', text: `Asiiik, pembayaran berhasil! ID Transaksi: ${data.transaction.original_request_id || refIdToCheck}. Kamu akan diarahkan sebentar lagi...`});
                 setIsProcessing(false);
                 setShowSuccessRedirectMessage(true);
                 setTimeout(() => {
@@ -162,7 +156,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
             } else if (['EXPIRED', 'FAILED', 'CANCELLED'].includes(transactionStatus)) { 
                 if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                 if (openedWindow && !openedWindow.closed) openedWindow.close();
-                setFeedbackMessage({ type: 'error', text: `Pembayaran ${transactionStatus.toLowerCase()}. ID Transaksi: ${data.transaction.original_request_id || refIdToCheck}. Silakan coba lagi atau hubungi dukungan.`});
+                setFeedbackMessage({ type: 'error', text: `Yah, pembayaran kamu ${transactionStatus.toLowerCase()}. ID Transaksi: ${data.transaction.original_request_id || refIdToCheck}. Mau coba lagi atau kontak support aja?`});
                 setIsProcessing(false);
             } else if (transactionStatus === 'PENDING') {
                 console.log('Payment pending, continuing to poll...');
@@ -185,7 +179,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                 setIsProcessing(false);
             } else if (!navigator.onLine) {
                  if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-                 setFeedbackMessage({ type: 'error', text: "Tidak ada koneksi internet. Periksa jaringan Anda."});
+                 setFeedbackMessage({ type: 'error', text: "Waduh, koneksi internetnya putus. Cek jaringanmu dulu ya."});
                  setIsProcessing(false);
             } else {
               console.warn(`Network or other technical issue during polling, DOKU window open. Error: ${error.message || 'Error tidak diketahui'}. Polling continues.`);
@@ -200,7 +194,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 
   const handleConfirmPurchase = async () => {
     if (!selectedGame || !selectedPackage || !accountDetails || !apiUrl) {
-      setFeedbackMessage({ type: 'error', text: "Informasi pembelian tidak lengkap atau URL API tidak tersedia."});
+      setFeedbackMessage({ type: 'error', text: "Waduh, info pembeliannya kurang lengkap atau API-nya lagi ngambek nih."});
       setIsProcessing(false);
       return;
     }
@@ -213,19 +207,19 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     const idGameValue = primaryAccountIdField ? accountDetails[primaryAccountIdField] : undefined;
 
     if (!idGameValue) {
-      setFeedbackMessage({ type: 'error', text: "Detail ID Game utama tidak ditemukan dalam data akun."});
+      setFeedbackMessage({ type: 'error', text: "ID Game utama kamu nggak ketemu nih di data akun."});
       setIsProcessing(false);
       return;
     }
     
     if (selectedPackage.originalId === undefined) { 
-      setFeedbackMessage({ type: 'error', text: "ID Layanan (originalId) tidak ditemukan untuk paket yang dipilih."});
+      setFeedbackMessage({ type: 'error', text: "ID Layanan (originalId) buat paket ini kok nggak ada ya."});
       setIsProcessing(false);
       return;
     }
     
     if (!accountDetails.username) {
-      setFeedbackMessage({ type: 'error', text: "Nickname tidak ditemukan. Pastikan akun sudah dicek."});
+      setFeedbackMessage({ type: 'error', text: "Nickname kamu belum ada. Dicek dulu gih akunnya."});
       setIsProcessing(false);
       return;
     }
@@ -246,7 +240,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       const result = await response.json();
 
       if (!response.ok) {
-        setFeedbackMessage({ type: 'error', text: result.error || result.message || `Gagal memproses pesanan (Error: ${response.status})`});
+        setFeedbackMessage({ type: 'error', text: result.error || result.message || `Gagal proses pesanan nih (Error: ${response.status})`});
         setIsProcessing(false);
         return;
       }
@@ -258,7 +252,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         const { payment_url, ref_id } = result;
         
         if (paymentWindowRef.current && !paymentWindowRef.current.closed) {
-            setFeedbackMessage({ type: 'info', text: "Jendela pembayaran sebelumnya masih terbuka. Harap selesaikan atau tutup terlebih dahulu."});
+            setFeedbackMessage({ type: 'info', text: "Eh, jendela pembayaran yang tadi masih kebuka. Selesain dulu atau tutup ya."});
             setIsProcessing(false); 
             return;
         }
@@ -272,16 +266,16 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           newWindow.focus(); 
           startPolling(ref_id, newWindow);
         } else {
-          setFeedbackMessage({ type: 'error', text: "Gagal membuka jendela pembayaran. Pastikan popup tidak diblokir dan coba lagi."});
+          setFeedbackMessage({ type: 'error', text: "Gagal buka jendela pembayaran. Coba cek popup blocker-nya, terus coba lagi."});
           setIsProcessing(false);
         }
       } else {
-        setFeedbackMessage({ type: 'error', text: "Format respons tidak dikenal dari server setelah memproses pesanan."});
+        setFeedbackMessage({ type: 'error', text: "Duh, respons dari servernya aneh setelah proses pesanan."});
         setIsProcessing(false);
       }
     } catch (error) {
       console.error("Error saat memproses pesanan:", error);
-      setFeedbackMessage({ type: 'error', text: "Tidak dapat terhubung ke server untuk memproses pesanan. Coba lagi nanti."});
+      setFeedbackMessage({ type: 'error', text: "Nggak bisa nyambung ke server buat proses pesanan. Coba lagi nanti ya."});
       setIsProcessing(false);
     }
   };
@@ -295,12 +289,12 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
         <AlertTriangle className="h-12 w-12 sm:h-16 sm:w-16 text-destructive mb-4" />
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-destructive mb-2">Informasi Tidak Lengkap</h1>
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-destructive mb-2">Waduh, Infonya Nggak Lengkap</h1>
         <p className="text-muted-foreground mb-6 text-xs sm:text-sm md:text-base">
-          Kami tidak dapat menemukan detail pembelian Anda. Silakan mulai dari awal.
+          Detail pembelianmu nggak ketemu nih. Coba mulai dari awal lagi ya.
         </p>
         <Button onClick={() => router.push('/')} variant="outline" size="sm" className="text-xs sm:text-sm">
-          Kembali ke Beranda
+          Balik ke Beranda
         </Button>
       </div>
     );
@@ -316,9 +310,9 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       </div>
       <div className="text-center">
          <ShieldCheck className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 text-primary mx-auto mb-3 sm:mb-4" />
-        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold text-foreground mb-1 sm:mb-2">Konfirmasi Pembelian Anda</h1>
+        <h1 className="text-xl sm:text-3xl md:text-4xl font-bold text-foreground mb-1 sm:mb-2">Konfirmasi Pembelian Kamu</h1>
         <p className="text-xs sm:text-base md:text-lg text-muted-foreground">
-          Harap tinjau detail pesanan Anda di bawah ini sebelum menyelesaikan pembelian.
+          Cek lagi detail pesananmu di bawah ini sebelum bayar ya.
         </p>
       </div>
 
@@ -338,7 +332,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         </CardHeader>
         <CardContent className="space-y-3 sm:space-y-6 p-4 sm:p-6 pt-0">
           <div>
-            <h3 className="text-xs sm:text-base md:text-lg font-semibold text-primary mb-1">Paket Terpilih:</h3>
+            <h3 className="text-xs sm:text-base md:text-lg font-semibold text-primary mb-1">Paket Pilihan:</h3>
             <div className="flex items-start space-x-2 sm:space-x-3 p-2 sm:p-3 bg-muted/30 rounded-md">
               {selectedPackage.imageUrl ? (
                   <Image src={selectedPackage.imageUrl} alt={selectedPackage.name} width={32} height={32} className="h-8 w-8 md:h-10 md:w-10 rounded-sm object-contain" data-ai-hint="package icon"/>
@@ -426,6 +420,4 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 };
 
 export default ConfirmationClient;
-    
-
     
