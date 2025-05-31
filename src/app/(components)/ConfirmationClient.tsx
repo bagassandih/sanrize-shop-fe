@@ -24,23 +24,18 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 
   useEffect(() => {
     if (!selectedGame || !selectedPackage || !accountDetails) {
-      router.replace('/');
+      router.replace('/'); // Redirect if essential data is missing
     }
+    // Cleanup polling interval on unmount
     return () => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
-      if (isProcessing && paymentWindowRef.current && !paymentWindowRef.current.closed) {
-        // Only close if unmounting while actively processing and window wasn't closed by success/fail logic.
-        // This is a fallback.
-        // paymentWindowRef.current.close(); 
-        // paymentWindowRef.current = null;
-        // Let's be less aggressive here; success/fail paths should handle closure.
-        // If user navigates away, OS handles orphaned window.
-      }
+      // Note: We are not aggressively closing paymentWindowRef.current on unmount here
+      // as DOKU window lifecycle is handled by user or explicit success/failure.
     };
-  }, [selectedGame, selectedPackage, accountDetails, router, isProcessing]);
+  }, [selectedGame, selectedPackage, accountDetails, router]);
 
 
   const startPolling = useCallback((refIdToCheck: string, openedWindow: Window | null) => {
@@ -49,17 +44,9 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     }
 
     const checkStatus = async () => {
-        if (!openedWindow) { // Should not happen if startPolling is called correctly
+        if (!openedWindow) {
             if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-            setIsProcessing(false);
             setPaymentError("Referensi jendela pembayaran hilang.");
-            return;
-        }
-
-        if (openedWindow.closed) {
-            console.log("Payment window closed by user.");
-            if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-            setPaymentError("Jendela pembayaran ditutup sebelum transaksi selesai.");
             setIsProcessing(false);
             return;
         }
@@ -67,9 +54,18 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         if (!apiUrl) {
             console.error("API URL not configured for polling.");
             if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-            setIsProcessing(false);
             setPaymentError("Konfigurasi API bermasalah untuk memeriksa status.");
-            // Don't close openedWindow here
+            setIsProcessing(false);
+            return;
+        }
+
+        if (openedWindow.closed) {
+            console.log("Jendela pembayaran ditutup oleh pengguna sebelum/selama pemeriksaan status.");
+            if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+            // If window is closed, transaction might be abandoned or completed elsewhere.
+            // Give a neutral message.
+            setPaymentError("Jendela pembayaran ditutup. Status transaksi mungkin belum final.");
+            setIsProcessing(false);
             return;
         }
 
@@ -80,8 +76,9 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
               body: JSON.stringify({ refId: refIdToCheck }),
             });
 
-            if (openedWindow.closed) { // Check again after fetch, user might have closed it.
-                console.log("Payment window closed by user during API call.");
+            // Check again if window was closed during API call
+            if (openedWindow.closed) {
+                console.log("Jendela pembayaran ditutup oleh pengguna setelah API call /check-transaction.");
                 if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                 setPaymentError("Jendela pembayaran ditutup.");
                 setIsProcessing(false);
@@ -89,64 +86,75 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
             }
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: "Gagal membaca respons error dari server." }));
-                console.error(`Error checking transaction status: ${response.status}`, errorData);
+                const errorResponseText = await response.text();
+                let errorDataMessage = `Gagal memeriksa status pembayaran (${response.status}).`;
+                try {
+                    const errorJson = JSON.parse(errorResponseText);
+                    errorDataMessage = errorJson.message || errorJson.error || errorDataMessage;
+                } catch (e) {
+                    console.warn("Could not parse error response as JSON from /check-transaction:", errorResponseText);
+                    if(errorResponseText) errorDataMessage += ` Respon server: ${errorResponseText.substring(0,100)}`;
+                }
+                
+                console.error(`Error checking transaction status: ${response.status}`, errorDataMessage);
                 
                 if (response.status === 404) { 
-                    // Keep polling if window open and 404 (could mean not found yet)
-                    // User closing the window will be caught at the start of the next checkStatus call.
+                    // 404: Transaction not found on DOKU side. This is expected if user hasn't interacted yet.
+                    // Continue polling silently if window is still open.
+                    console.log('Transaction not found (404) on DOKU. User might be interacting or transaction not fully init. Continuing poll.');
                 } else {
-                    // For other server errors (500, 400, etc.)
+                    // For other server errors (500, 400, etc.), stop polling and inform user.
                     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-                    setPaymentError(errorData.message || `Gagal memeriksa status pembayaran (${response.status}). Silakan coba lagi atau hubungi dukungan jika masalah berlanjut.`);
+                    setPaymentError(errorDataMessage);
                     setIsProcessing(false);
-                    // DO NOT close openedWindow here. Let the user decide.
+                    // Do NOT close openedWindow here for these errors.
                 }
-                return;
+                return; // Exit checkStatus for this interval if !response.ok
             }
+            
             const data = await response.json();
 
             if (data.status === 'PAID' || data.status === 'SUCCESS') { 
                 if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                 if (openedWindow && !openedWindow.closed) openedWindow.close();
                 router.push('/success');
-                // setIsProcessing(false); // router.push will unmount or re-trigger useEffect
-                // setPaymentError(null);
             } else if (['FAILED', 'CANCELLED', 'EXPIRED'].includes(data.status)) { 
                 if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                 if (openedWindow && !openedWindow.closed) openedWindow.close();
                 setPaymentError(data.message || "Pembayaran gagal, dibatalkan, atau kedaluwarsa.");
                 setIsProcessing(false);
             } else if (data.status === 'PENDING') {
-                console.log('Payment pending, continuing to poll...');
-                // If window closed by user, it's caught at the start of the next checkStatus.
+                console.log('Payment pending on DOKU, continuing to poll...');
             } else {
-                console.warn("Unknown transaction status:", data.status, " - Message:", data.message);
-                // For unknown status, keep polling if window is open. User might close it.
+                console.warn("Unknown transaction status from DOKU:", data.status, " - Message:", data.message);
+                // For unknown status, keep polling if window is open.
             }
-        } catch (error) {
-            console.error("Error during polling checkTransactionStatus (catch block):", error);
-            if (openedWindow.closed) { // Check if user closed it during the error condition
+        } catch (error) { // Network error or other JS error during fetch/processing
+            console.error("Error during polling (checkStatus catch block):", error);
+            
+            if (openedWindow.closed) {
                 if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-                setPaymentError("Jendela pembayaran ditutup atau terjadi masalah jaringan.");
+                setPaymentError("Jendela pembayaran ditutup atau terjadi masalah jaringan saat pemeriksaan status.");
                 setIsProcessing(false);
                 return;
             }
             
             if (!navigator.onLine) {
                  if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-                 setPaymentError("Tidak ada koneksi internet. Periksa jaringan Anda.");
+                 setPaymentError("Tidak ada koneksi internet. Periksa jaringan Anda dan status pembayaran di DOKU.");
                  setIsProcessing(false);
-                 // DO NOT close openedWindow here. Let the user manage it.
+            } else {
+              // For other transient network/JS errors, if window is open, allow polling to continue.
+              console.warn("A network or JS error occurred during polling, but window is open. Polling will continue.");
             }
-            // For other transient network errors, allow polling to continue.
-            // If error is persistent, user will likely close the window, which will stop polling.
         }
     };
 
     pollingIntervalRef.current = setInterval(checkStatus, 3000);
-    checkStatus(); // Initial check
-  }, [apiUrl, router, setIsProcessing, setPaymentError]); // Removed selectedGame, etc. as they are not directly used by polling logic after init
+    // checkStatus(); // Initial check, DOKU might return 404 immediately. Let interval handle first check.
+    // Let's do an initial check still, as it might catch an immediate issue or a pre-existing PAID status
+    setTimeout(checkStatus, 100); // Slight delay for the first check
+  }, [apiUrl, router, setIsProcessing, setPaymentError]);
 
 
   const handleConfirmPurchase = async () => {
@@ -196,18 +204,19 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       const result = await response.json();
 
       if (!response.ok) {
-        setPaymentError(result.error || `Gagal memproses pesanan (Error: ${response.status})`);
+        setPaymentError(result.error || result.message || `Gagal memproses pesanan (Error: ${response.status})`);
         setIsProcessing(false);
         return;
       }
 
-      if (result.error) {
-        setPaymentError(result.error);
+      if (result.error || result.message) { // Some APIs use 'message' for errors
+        setPaymentError(result.error || result.message);
         setIsProcessing(false);
       } else if (result.payment_url && result.ref_id) {
         const { payment_url, ref_id } = result;
         
-        const newWindow = window.open(payment_url, "_blank", "width=800,height=700,scrollbars=yes,resizable=yes");
+        // Explicitly type `Window | null` for newWindow
+        const newWindow: Window | null = window.open(payment_url, "_blank", "width=800,height=700,scrollbars=yes,resizable=yes");
         
         if (newWindow) {
           paymentWindowRef.current = newWindow;
