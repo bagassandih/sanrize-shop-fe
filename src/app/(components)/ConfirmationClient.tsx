@@ -9,25 +9,6 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck, Gem, ArrowLeft, Info } from 'lucide-react';
 import Image from 'next/image';
 
-// loadJokulCheckout is no longer used
-// declare global {
-//   interface Window {
-//     loadJokulCheckout: (paymentUrl: string, options?: JokulCheckoutOptions) => void;
-//   }
-// }
-
-// interface JokulCheckoutOptions {
-//   cancelRedirectUrl?: string;
-//   continueRedirectUrl?: string;
-//   failedRedirectUrl?: string;
-//   onClose?: () => void;
-//   onLoad?: () => void;
-//   onCancel?: () => void;
-//   onContinueSuccess?: () => void;
-//   onContinueFailed?: () => void;
-//   onError?: (data: any) => void;
-// }
-
 interface ConfirmationClientProps {
   apiUrl?: string;
 }
@@ -50,6 +31,10 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
       }
+      // Ensure payment window is closed if component unmounts while processing
+      if (paymentWindowRef.current && !paymentWindowRef.current.closed) {
+        paymentWindowRef.current.close();
+      }
     };
   }, [selectedGame, selectedPackage, accountDetails, router]);
 
@@ -70,17 +55,31 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         }
 
         try {
-            const response = await fetch(`${apiUrl}/check-transaction?refId=${refIdToCheck}`);
+            const response = await fetch(`${apiUrl}/check-transaction`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ refId: refIdToCheck }),
+            });
+
             if (!response.ok) {
                 console.error(`Error checking transaction status: ${response.status}`);
-                // Consider stopping polling after N errors or for specific HTTP errors
-                // For now, let it continue or be handled by status codes if API returns structured error for 4xx/5xx
-                if (response.status === 404) { // Example: if 404 means transaction not found yet
+                const errorData = await response.json().catch(() => ({ message: "Gagal memeriksa status, respons tidak valid." }));
+                if (response.status === 404) { 
                     if (openedWindow && openedWindow.closed) {
                         if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-                        setPaymentError("Jendela pembayaran ditutup atau transaksi tidak ditemukan.");
+                        setPaymentError(errorData.message || "Jendela pembayaran ditutup atau transaksi tidak ditemukan.");
                         setIsProcessing(false);
+                    } else {
+                        // Keep polling if window open and 404 (could mean not found yet)
                     }
+                } else {
+                    // For other errors, consider stopping or specific handling
+                    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                    setPaymentError(errorData.message || `Gagal memeriksa status (${response.status}).`);
+                    setIsProcessing(false);
+                    if (openedWindow && !openedWindow.closed) openedWindow.close();
                 }
                 return;
             }
@@ -111,16 +110,25 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
             } else {
                 console.warn("Unknown transaction status:", data.status, " - Message:", data.message);
                 // Optionally stop polling for unknown statuses if they are persistent
+                if (openedWindow && openedWindow.closed) {
+                     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                     setPaymentError(data.message || "Jendela pembayaran ditutup, status tidak diketahui.");
+                     setIsProcessing(false);
+                }
             }
         } catch (error) {
             console.error("Error during polling checkTransactionStatus:", error);
-            // Don't stop polling for network errors, could be temporary.
-            // If the payment window is closed by user, this might also cause issues if not handled.
             if (openedWindow && openedWindow.closed) {
                 if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                 setPaymentError("Jendela pembayaran ditutup atau terjadi masalah jaringan.");
                 setIsProcessing(false);
+            } else if (!navigator.onLine) {
+                 if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                 setPaymentError("Tidak ada koneksi internet. Periksa jaringan Anda.");
+                 setIsProcessing(false);
+                 if (openedWindow && !openedWindow.closed) openedWindow.close();
             }
+            // For other network errors, let it try again or rely on window close
         }
     };
 
@@ -149,7 +157,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       return;
     }
     
-    if (selectedPackage.originalId === undefined) { // Check for undefined explicitly
+    if (selectedPackage.originalId === undefined) { 
       setPaymentError("ID Layanan (originalId) tidak ditemukan untuk paket yang dipilih.");
       setIsProcessing(false);
       return;
@@ -189,11 +197,13 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         setIsProcessing(false);
       } else if (result.payment_url && result.ref_id) {
         const { payment_url, ref_id } = result;
-        // Open DOKU payment page in a new window/tab
+        
         const newWindow = window.open(payment_url, "_blank", "width=800,height=700,scrollbars=yes,resizable=yes");
         
         if (newWindow) {
           paymentWindowRef.current = newWindow;
+          // Make sure the window is focused, though browser behavior might vary
+          newWindow.focus(); 
           startPolling(ref_id, newWindow);
           // isProcessing remains true while polling
         } else {
@@ -234,7 +244,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   return (
     <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8 p-2">
       <div className="mb-4">
-        <Button variant="outline" onClick={() => router.back()} size="sm" className="text-xs sm:text-sm" disabled={isProcessing}>
+        <Button variant="outline" onClick={() => { if (!isProcessing) router.back(); }} size="sm" className="text-xs sm:text-sm" disabled={isProcessing}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Kembali
         </Button>
@@ -336,4 +346,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 };
 
 export default ConfirmationClient;
+    
+
     
