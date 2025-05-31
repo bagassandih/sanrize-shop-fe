@@ -12,8 +12,20 @@ import Image from 'next/image';
 // Declare DOKU's global function for TypeScript
 declare global {
   interface Window {
-    loadJokulCheckout: (paymentUrl: string) => void;
+    loadJokulCheckout: (paymentUrl: string, options?: JokulCheckoutOptions) => void;
   }
+}
+
+interface JokulCheckoutOptions {
+  cancelRedirectUrl?: string;
+  continueRedirectUrl?: string;
+  failedRedirectUrl?: string;
+  onClose?: () => void;
+  onLoad?: () => void;
+  onCancel?: () => void;
+  onContinueSuccess?: () => void;
+  onContinueFailed?: () => void;
+  onError?: (data: any) => void;
 }
 
 interface ConfirmationClientProps {
@@ -91,31 +103,46 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         setIsProcessing(false);
       } else if (result.payment_url) {
         if (typeof window.loadJokulCheckout === 'function') {
-          window.loadJokulCheckout(result.payment_url);
-          // Asumsi DOKU popup mengambil alih. Navigasi ke sukses setelah DOKU selesai
-          // Untuk saat ini, kita navigasi setelah memanggil popup.
-          // Idealnya, ada callback sukses dari DOKU.
-          // Setelah memanggil DOKU, bisa saja pengguna menutup popup, jadi state sukses bisa jadi prematur.
-          // Untuk simplisitas sementara:
-          setTimeout(() => {
-             // Navigasi ke sukses mungkin perlu dipikirkan ulang tergantung flow DOKU.
-             // Jika DOKU melakukan redirect sendiri, maka baris ini tidak perlu.
-             // Jika tidak, kita mungkin perlu halaman perantara atau cara lain untuk konfirmasi.
-             // Untuk sekarang, kita asumsikan setelah panggil, proses lanjut ke halaman sukses.
-             router.push('/success');
-          }, 1000); // Beri sedikit waktu agar popup DOKU sempat termuat
+          window.loadJokulCheckout(result.payment_url, {
+            onContinueSuccess: () => {
+              // Navigate to success page only when DOKU confirms success and user clicks continue
+              router.push('/success');
+            },
+            onCancel: () => {
+              setPaymentError("Pembayaran dibatalkan oleh pengguna.");
+              setIsProcessing(false);
+            },
+            onClose: () => {
+              // User closed the DOKU popup without completing or explicitly cancelling
+              // Decide if an error message is needed or just reset processing state
+              setPaymentError("Jendela pembayaran ditutup.");
+              setIsProcessing(false);
+            },
+            onError: (dokuError: any) => {
+              console.error("DOKU Checkout Error:", dokuError);
+              setPaymentError("Terjadi kesalahan pada proses pembayaran DOKU. Silakan coba lagi.");
+              setIsProcessing(false);
+            },
+            onLoad: () => {
+              // DOKU Checkout page has loaded, isProcessing should remain true
+            }
+          });
+          // No automatic navigation here, DOKU callbacks will handle it.
+          // isProcessing remains true while DOKU popup is active.
         } else {
           setPaymentError("Fungsi pembayaran DOKU tidak ditemukan. Pastikan skrip telah dimuat.");
+          setIsProcessing(false);
         }
       } else {
         setPaymentError("Format respons tidak dikenal dari server setelah memproses pesanan.");
+        setIsProcessing(false);
       }
     } catch (error) {
       console.error("Error saat memproses pesanan:", error);
       setPaymentError("Tidak dapat terhubung ke server untuk memproses pesanan. Coba lagi nanti.");
-    } finally {
-      // setIsProcessing(false); // Dibiarkan true jika DOKU popup yang menghandle
+      setIsProcessing(false);
     }
+    // No finally block to set isProcessing to false if DOKU is launched, as DOKU callbacks manage it.
   };
   
   const formatPriceIDR = (price: number) => {
@@ -243,3 +270,4 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 };
 
 export default ConfirmationClient;
+    
