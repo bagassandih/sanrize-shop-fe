@@ -30,7 +30,9 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 
   useEffect(() => {
     if (!selectedGame || !selectedPackage || !accountDetails) {
-      router.replace('/');
+      // This check is for initial load. If context is lost, it shows error UI.
+      // If context becomes null *after* a successful payment (due to resetPurchase),
+      // this guard will trigger the error UI below.
     }
     return () => {
       if (pollingIntervalRef.current) {
@@ -53,7 +55,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     const checkStatus = async () => {
         if (!openedWindow) {
             if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-            // Only set feedback if no other conclusive feedback (like SUCCESS) has been set.
             if (!feedbackMessage || feedbackMessage.type !== 'success') {
               setFeedbackMessage({ type: 'error', text: "Referensi jendela pembayaran hilang."});
             }
@@ -73,8 +74,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 
         if (openedWindow.closed) {
             if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-            // Check if a final status (SUCCESS, EXPIRED, FAILED, CANCELLED) has already been processed.
-            // If not, and the window is closed, it's likely a user cancellation or an unresolved issue.
             const isFinalStatusProcessed = feedbackMessage && (feedbackMessage.text.toLowerCase().includes('berhasil') || feedbackMessage.text.toLowerCase().includes('kedaluwarsa') || feedbackMessage.text.toLowerCase().includes('gagal') || feedbackMessage.text.toLowerCase().includes('dibatalkan'));
             if (!isFinalStatusProcessed) {
                 setFeedbackMessage({ type: 'info', text: "Jendela pembayaran ditutup. Status transaksi mungkin belum final atau dibatalkan."});
@@ -90,19 +89,18 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
               body: JSON.stringify({ refId: refIdToCheck }),
             });
             
-            // Handling if window closed during fetch (rare, but possible)
             if (openedWindow.closed) {
                 let isSuccessStatus = false;
                  if(response.ok) {
                     try {
-                        const tempData = await response.clone().json(); // Clone to read body multiple times
+                        const tempData = await response.clone().json();
                         if (tempData.transaction && tempData.transaction.status === 'SUCCESS') {
                             isSuccessStatus = true;
                         }
-                    } catch (e) { /* ignore clone/json parse error here */ }
+                    } catch (e) { /* ignore */ }
                  }
 
-                if (!isSuccessStatus) { // If not explicitly successful before closing
+                if (!isSuccessStatus) {
                     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                     const isFinalStatusProcessed = feedbackMessage && (feedbackMessage.text.toLowerCase().includes('berhasil') || feedbackMessage.text.toLowerCase().includes('kedaluwarsa') || feedbackMessage.text.toLowerCase().includes('gagal') || feedbackMessage.text.toLowerCase().includes('dibatalkan'));
                     if (!isFinalStatusProcessed) {
@@ -133,9 +131,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                 
                 if (!openedWindow.closed) { 
                     console.warn(`HTTP ${response.status} error during /check-transaction, DOKU window open. Error: ${detailedErrorMessage}. Polling continues.`);
-                    // Don't set feedback message to user, just log and continue polling
                 } else { 
-                    // Window closed AND there was an error.
                     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                     const isFinalStatusProcessed = feedbackMessage && (feedbackMessage.text.toLowerCase().includes('berhasil') || feedbackMessage.text.toLowerCase().includes('kedaluwarsa') || feedbackMessage.text.toLowerCase().includes('gagal') || feedbackMessage.text.toLowerCase().includes('dibatalkan'));
                     if (!isFinalStatusProcessed) {
@@ -143,7 +139,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                     }
                     setIsProcessing(false);
                 }
-                return; // Return to continue polling if window is open, or stop if closed.
+                return; 
             }
             
             const data = await response.json();
@@ -151,7 +147,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
             if (!data.transaction || !data.transaction.status) {
                 console.warn("Format respons /check-transaction tidak valid. 'transaction.status' tidak ditemukan. Respons:", data);
                 if (!openedWindow.closed) {
-                    // Keep polling if window is open and format is unknown
+                    // Keep polling
                 } else {
                     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                     setFeedbackMessage({ type: 'error', text: "Format respons status transaksi tidak dikenal."});
@@ -166,13 +162,11 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
             if (transactionStatus === 'SUCCESS') { 
                 if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                 if (openedWindow && !openedWindow.closed) openedWindow.close();
-                setFeedbackMessage({ type: 'success', text: `Asiiik, pembayaran berhasil! ID Transaksi: ${originalReqId}. Kamu akan diarahkan sebentar lagi...`});
+                setFeedbackMessage({ type: 'success', text: `Asiiik, pembayaran berhasil! ID Transaksi: ${originalReqId}.`});
                 setIsProcessing(false);
                 setShowSuccessRedirectMessage(true);
-                setTimeout(() => {
-                  resetPurchase(); // Clear context before redirecting
-                  router.push('/success');
-                }, 4000);
+                // resetPurchase(); // Removed: context will be reset if user navigates to /success or starts new purchase
+                // router.push('/success'); // Removed: no automatic redirect
             } else if (['EXPIRED', 'FAILED', 'CANCELLED'].includes(transactionStatus)) { 
                 if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                 if (openedWindow && !openedWindow.closed) openedWindow.close();
@@ -186,18 +180,16 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                 console.log('Payment pending, continuing to poll...');
             } else { 
                 console.warn("Unknown transaction status from API:", transactionStatus, " - Full Response:", data);
-                 if (openedWindow && openedWindow.closed) { // If window closed with unknown status
+                 if (openedWindow && openedWindow.closed) { 
                     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                     setFeedbackMessage({ type: 'info', text: "Status transaksi tidak diketahui dan jendela pembayaran telah ditutup."});
                     setIsProcessing(false);
                  }
-                 // If window still open with unknown status, continue polling
             }
         } catch (error: any) { 
             console.error("Error during polling (checkStatus catch block):", error);
             
             if (openedWindow && openedWindow.closed) {
-                // Window closed, and an error occurred during fetch (e.g. network error after window close)
                 if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                 const isFinalStatusProcessed = feedbackMessage && (feedbackMessage.text.toLowerCase().includes('berhasil') || feedbackMessage.text.toLowerCase().includes('kedaluwarsa') || feedbackMessage.text.toLowerCase().includes('gagal') || feedbackMessage.text.toLowerCase().includes('dibatalkan'));
                 if (!isFinalStatusProcessed) {
@@ -205,21 +197,17 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                 }
                 setIsProcessing(false);
             } else if (!navigator.onLine) {
-                 // Actual network disconnection
                  if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                  setFeedbackMessage({ type: 'error', text: "Waduh, koneksi internetnya putus. Cek jaringanmu dulu ya."});
                  setIsProcessing(false);
-                 // Don't close DOKU window here, user might reconnect and DOKU page might still be valid
             } else {
-              // Other error (e.g., server down, CORS) while DOKU window is open.
-              // Log it, but continue polling as it might be transient.
               console.warn(`Network or other technical issue during polling, DOKU window open. Error: ${error.message || 'Error tidak diketahui'}. Polling continues.`);
             }
         }
     };
 
     pollingIntervalRef.current = setInterval(checkStatus, 3000);
-    setTimeout(checkStatus, 1000); // Initial check sooner
+    setTimeout(checkStatus, 1000);
   }, [apiUrl, router, setIsProcessing, setFeedbackMessage, feedbackMessage, resetPurchase]);
 
 
@@ -266,7 +254,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       nickname: accountDetails.username,
     };
 
-    // Logic to find and add idZone from accountDetails
     let identifiedZoneValue: string | undefined = undefined;
     const mainIdFieldNameFromGameConfig = selectedGame.accountIdFields[0]?.name; 
 
@@ -322,10 +309,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         
         if (paymentWindowRef.current && !paymentWindowRef.current.closed) {
             setFeedbackMessage({ type: 'info', text: "Eh, jendela pembayaran yang tadi masih kebuka. Selesain dulu atau tutup ya."});
-            // Don't set isProcessing to false here if a window is already open and might be polled.
-            // Or, ensure polling stops for the old window if we allow opening a new one.
-            // For simplicity, let's prevent opening a new one if an old one is active.
-            // setIsProcessing(false); 
             return; 
         }
         
@@ -337,10 +320,9 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           paymentWindowRef.current = newWindow;
           newWindow.focus(); 
           startPolling(ref_id, newWindow);
-          // setIsProcessing(true) is already set at the beginning of handleConfirmPurchase
         } else {
           setFeedbackMessage({ type: 'error', text: "Gagal buka jendela pembayaran. Coba cek popup blocker-nya, terus coba lagi."});
-          setIsProcessing(false); // Failed to open window, so stop processing.
+          setIsProcessing(false); 
         }
       } else {
         setFeedbackMessage({ type: 'error', text: "Duh, respons dari servernya aneh setelah proses pesanan."});
@@ -376,7 +358,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   return (
     <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8 p-2">
       <div className="mb-4">
-        <Button variant="outline" onClick={() => { if (!isProcessing && !showSuccessRedirectMessage) router.back(); }} size="sm" className="text-xs sm:text-sm" disabled={isProcessing || showSuccessRedirectMessage}>
+        <Button variant="outline" onClick={() => { if (!isProcessing) router.back(); }} size="sm" className="text-xs sm:text-sm" disabled={isProcessing}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Kembali
         </Button>
@@ -478,7 +460,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         ) : showSuccessRedirectMessage ? (
           <>
             <CheckCircle2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-            Pembayaran Sukses, Mengarahkan...
+            Pembayaran Berhasil!
           </>
         )
         : (
