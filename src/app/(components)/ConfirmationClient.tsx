@@ -352,14 +352,14 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       {isProcessing && !feedbackMessage && (
         <div className="flex flex-col items-center justify-center py-10">
           <Card className="my-6 border-primary bg-primary/10 shadow-lg w-full max-w-md">
-            <CardHeader className="flex flex-col items-center text-center space-y-3 p-4 sm:p-6">
-              <Loader2 className="h-10 w-10 sm:h-12 sm:h-12 text-primary animate-spin" />
-              <CardTitle className="text-lg sm:text-xl md:text-2xl text-primary">
+            <CardHeader className="flex flex-col items-center text-center space-y-4 sm:space-y-6 p-6 sm:p-8">
+              <Loader2 className="h-16 w-16 sm:h-20 sm:w-20 text-primary animate-spin" />
+              <CardTitle className="text-2xl sm:text-3xl md:text-4xl text-primary">
                 Sedang Memproses...
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-4 sm:p-6 pt-0 text-center">
-              <p className="text-sm sm:text-base text-muted-foreground">
+            <CardContent className="p-6 sm:p-8 pt-0 text-center">
+              <p className="text-base sm:text-lg text-muted-foreground">
                 Sabar ya, status pembayaranmu lagi dicek nih. Mohon jangan refresh atau tutup halaman ini. Popup pembayaran akan muncul atau status akan diperbarui.
               </p>
             </CardContent>
@@ -398,19 +398,19 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                   {feedbackMessage.text}
                 </p>
 
-                <div className="text-left text-sm sm:text-base bg-muted/30 p-3 sm:p-4 rounded-md my-4 space-y-1.5">
+                <div className="text-left bg-muted/30 p-3 sm:p-4 rounded-md my-4 space-y-1.5">
                   <h4 className="font-semibold text-primary mb-2 text-base sm:text-lg">Detail Transaksi:</h4>
                   {feedbackMessage.transactionId && (
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-sm sm:text-base">
                       <span className="text-muted-foreground">ID Transaksi:</span>
                       <span className="font-medium text-foreground">{feedbackMessage.transactionId}</span>
                     </div>
                   )}
-                  <div className="flex justify-between">
+                  <div className="flex justify-between text-sm sm:text-base">
                     <span className="text-muted-foreground">Game:</span>
                     <span className="font-medium text-foreground">{selectedGame.name}</span>
                   </div>
-                  <div className="flex justify-between items-start">
+                  <div className="flex justify-between items-start text-sm sm:text-base">
                       <span className="text-muted-foreground pt-0.5">Paket:</span>
                       <div className="text-right">
                           <span className="font-medium text-foreground block">{selectedPackage.name}</span>
@@ -427,15 +427,15 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                        fieldLabel = selectedGame.accountIdFields.find(f => f.name === key)?.label || key.charAt(0).toUpperCase() + key.slice(1);
                      }
                      return (
-                        <div className="flex justify-between" key={key}>
+                        <div className="flex justify-between text-sm sm:text-base" key={key}>
                             <span className="text-muted-foreground">{fieldLabel}:</span>
                             <span className="font-medium text-foreground">{String(value)}</span>
                         </div>
                      );
                   })}
-                  <div className="flex justify-between border-t border-border pt-2 mt-2">
-                      <span className="text-muted-foreground text-base sm:text-lg">Total Bayar:</span>
-                      <span className="font-bold text-accent text-base sm:text-lg">{formatPriceIDR(selectedPackage.price)}</span>
+                  <div className="flex justify-between border-t border-border pt-2 mt-2 text-base sm:text-lg">
+                      <span className="text-muted-foreground">Total Bayar:</span>
+                      <span className="font-bold text-accent">{formatPriceIDR(selectedPackage.price)}</span>
                   </div>
                 </div>
                 
