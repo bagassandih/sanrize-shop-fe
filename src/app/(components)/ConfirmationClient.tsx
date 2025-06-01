@@ -1,4 +1,3 @@
-
 "use client";
 
 import { usePurchase } from '@/app/(store)/PurchaseContext';
@@ -24,6 +23,12 @@ interface FeedbackMessage {
 declare global {
   interface Window {
     loadJokulCheckout?: (paymentUrl: string) => void;
+    // DOKU defines a global Dokuமுடி on their script.
+    // While not directly used by our loadJokulCheckout call, it's good to be aware of it.
+    // We might also need a callback if DOKU provides one for when the popup closes.
+    // For now, we'll rely on polling and user interaction.
+    // dokuPaymentSuccessCallback?: (data: any) => void;
+    // dokuPaymentErrorCallback?: (data: any) => void;
   }
 }
 
@@ -35,8 +40,10 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentRefId = useRef<string | null>(null);
+  // No longer directly managing openedWindow as DOKU's script handles the popup.
 
   useEffect(() => {
+    // Cleanup interval on component unmount
     return () => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
@@ -64,6 +71,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       if (!apiUrl) {
         console.error("API URL not configured for polling.");
         if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+        // Only set feedback if not already showing a success/final message
         if (!feedbackMessage || feedbackMessage.type !== 'success') {
           setFeedbackMessage({ type: 'error', text: "Konfigurasi API untuk pemeriksaan status bermasalah." });
         }
@@ -78,41 +86,41 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           body: JSON.stringify({ refId: currentRefId.current }),
         });
 
+        // If response is not OK (e.g., 500, 400, 401, 403, or even 404 initially)
         if (!response.ok) {
           const errorResponseText = await response.text();
           let detailedErrorMessage = `Gagal memeriksa status pembayaran (HTTP ${response.status}).`;
-           if (response.status !== 404) { // Don't show user error for 404 if popup might be open
-            try {
-                const errorJson = JSON.parse(errorResponseText);
-                const serverMsg = errorJson.message || errorJson.error;
-                if (serverMsg) {
-                    detailedErrorMessage += ` Pesan: ${serverMsg}`;
-                } else if (errorResponseText.trim() !== '{}' && errorResponseText.trim() !== '') {
-                    detailedErrorMessage += ` Respon server: ${errorResponseText.substring(0,150)}`;
-                }
-            } catch (e) {
-                if (errorResponseText.trim() !== '') {
-                   detailedErrorMessage += ` Respon server (non-JSON): ${errorResponseText.substring(0,150)}`;
-                }
-            }
-            console.warn(`HTTP ${response.status} error from /check-transaction. Response: ${detailedErrorMessage}. Polling continues if relevant.`);
-             // Only set feedback and stop if it's a persistent issue or user context changes (e.g., DOKU window closed, or non-404 error)
-             // For now, we let polling continue for non-404 errors if DOKU window might be open,
-             // but this could be refined if DOKU popup isn't directly checkable.
-             // The feedback will be set only if polling stops due to a definitive status or other condition.
-           } else {
-             console.log("HTTP 404: Transaction not found yet, continuing poll as DOKU popup might be open.");
-           }
-          return;
+          
+          // Try to parse server message if available
+          try {
+              const errorJson = JSON.parse(errorResponseText);
+              const serverMsg = errorJson.message || errorJson.error;
+              if (serverMsg) {
+                  detailedErrorMessage += ` Pesan: ${serverMsg}`;
+              } else if (errorResponseText.trim() !== '{}' && errorResponseText.trim() !== '') {
+                  detailedErrorMessage += ` Respon server: ${errorResponseText.substring(0,150)}`;
+              }
+          } catch (e) {
+              if (errorResponseText.trim() !== '') {
+                 detailedErrorMessage += ` Respon server (non-JSON): ${errorResponseText.substring(0,150)}`;
+              }
+          }
+          console.warn(`Error from /check-transaction: ${detailedErrorMessage}. Ref ID: ${currentRefId.current}. Polling continues if DOKU popup might be open.`);
+          
+          // No explicit action to stop polling or set user-facing error here if popup is open
+          // This allows DOKU interaction to complete. The polling will continue.
+          // If DOKU popup closes or a definitive status comes, that will handle it.
+          // We assume the DOKU popup itself provides user feedback for immediate DOKU-side errors.
+          return; 
         }
 
         const data = await response.json();
 
         if (!data.transaction || typeof data.transaction.status === 'undefined') {
-          console.warn("Format respons /check-transaction tidak valid. 'transaction.status' tidak ditemukan atau undefined. Respons:", data);
-          return;
+          console.warn("Format respons /check-transaction tidak valid. 'transaction.status' tidak ditemukan atau undefined. Respons:", data, "Polling continues if DOKU popup might be open.");
+          return; // Continue polling
         }
-
+        
         const transactionStatus = String(data.transaction.status).toUpperCase();
         const originalReqId = data.transaction.original_request_id || currentRefId.current;
 
@@ -121,7 +129,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           currentRefId.current = null;
           setFeedbackMessage({ type: 'success', text: `Asiiik, pembayaran berhasil! Item akan segera dikirim ke akunmu.`, transactionId: originalReqId });
           setIsProcessing(false);
-          // No automatic redirect
+          // No automatic redirect, user clicks button on feedback card
         } else if (['EXPIRED', 'FAILED', 'CANCELLED'].includes(transactionStatus)) {
           if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
           currentRefId.current = null;
@@ -129,19 +137,23 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           if (statusText === 'failed') statusText = 'gagal';
           if (statusText === 'expired') statusText = 'kedaluwarsa';
           if (statusText === 'cancelled') statusText = 'dibatalkan';
-          setFeedbackMessage({ type: 'error', text: `Yah, pembayaran kamu ${statusText}. Mau coba lagi atau kontak support aja?`, transactionId: originalReqId });
+          setFeedbackMessage({ type: 'error', text: `Yah, pembayaran kamu ${statusText}. ID Transaksi: ${originalReqId}. Mau coba lagi atau kontak support aja?`, transactionId: originalReqId });
           setIsProcessing(false);
         } else if (transactionStatus === 'PENDING') {
           console.log('Payment pending, continuing to poll...');
+          // Maintain isProcessing = true
         } else {
-          console.warn("Unknown transaction status from API:", transactionStatus, " - Full Response:", data);
+          console.warn("Unknown transaction status from API:", transactionStatus, " - Full Response:", data, "Polling continues if DOKU popup might be open.");
+          // Maintain isProcessing = true if popup might be open
         }
       } catch (error: any) {
         console.error("Error during polling (checkStatus catch block):", error);
         if (!navigator.onLine) {
            if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
            currentRefId.current = null;
-           setFeedbackMessage({ type: 'error', text: "Waduh, koneksi internetnya putus. Cek jaringanmu dulu ya."});
+           if (!feedbackMessage || feedbackMessage.type !== 'success') {
+             setFeedbackMessage({ type: 'error', text: "Waduh, koneksi internetnya putus. Cek jaringanmu dulu ya."});
+           }
            setIsProcessing(false);
         } else {
           console.warn(`Network or other technical issue during polling. Error: ${error.message || 'Error tidak diketahui'}. Polling continues if DOKU window might be open.`);
@@ -149,8 +161,14 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       }
     };
 
-    pollingIntervalRef.current = setInterval(checkStatus, 3000);
-    checkStatus(); // Initial check immediately
+    // Start polling: initial check, then interval
+    // We wait a bit before the first check to give DOKU time if there's an immediate redirect/init
+    setTimeout(() => {
+      checkStatus();
+      pollingIntervalRef.current = setInterval(checkStatus, 5000); // Poll every 5 seconds
+    }, 2000);
+
+
   }, [apiUrl, feedbackMessage, resetPurchase, selectedGame, selectedPackage, accountDetails]);
 
   const handleConfirmPurchase = async () => {
@@ -158,7 +176,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
-    currentRefId.current = null;
+    currentRefId.current = null; // Reset current ref_id before a new attempt
 
     if (!selectedGame || !selectedPackage || !accountDetails || !apiUrl) {
       setFeedbackMessage({ type: 'error', text: "Waduh, info pembeliannya kurang lengkap atau API-nya lagi ngambek nih." });
@@ -166,7 +184,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     }
 
     setIsProcessing(true);
-    setFeedbackMessage(null);
+    setFeedbackMessage(null); // Clear previous feedback
 
     const primaryAccountIdField = selectedGame.accountIdFields[0]?.name;
     const idGameValue = primaryAccountIdField ? accountDetails[primaryAccountIdField] : undefined;
@@ -181,7 +199,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       setIsProcessing(false);
       return;
     }
-    if (!accountDetails.username) {
+    if (!accountDetails.username) { // Assuming username is always fetched and part of accountDetails
       setFeedbackMessage({ type: 'error', text: "Nickname kamu belum ada. Dicek dulu gih akunnya." });
       setIsProcessing(false);
       return;
@@ -192,25 +210,36 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       idService: selectedPackage.originalId,
       nickname: accountDetails.username,
     };
-
+    
+    // Logic to find and add idZone if applicable
     let identifiedZoneValue: string | undefined = undefined;
-    const mainIdFieldNameFromGameConfig = selectedGame.accountIdFields[0]?.name;
+    const mainIdFieldNameFromGameConfig = selectedGame.accountIdFields[0]?.name; // Assuming first field is main ID
     if (accountDetails) {
+      // Iterate through accountIdFields defined for the game
       for (const fieldInConfig of selectedGame.accountIdFields) {
+        // Skip the main ID field itself and username
         if (mainIdFieldNameFromGameConfig && fieldInConfig.name === mainIdFieldNameFromGameConfig) continue;
-        if (fieldInConfig.name.toLowerCase() === 'username') continue;
+        if (fieldInConfig.name.toLowerCase() === 'username') continue; // Username is handled separately
+
+        // Check if field name or label suggests it's a zone/server ID
         const fieldNameFromConfigLower = fieldInConfig.name.toLowerCase();
         const fieldLabelFromConfigLower = fieldInConfig.label.toLowerCase();
-        if (fieldNameFromConfigLower.includes('zone') || fieldNameFromConfigLower.includes('server') || fieldLabelFromConfigLower.includes('zone') || fieldLabelFromConfigLower.includes('server')) {
+
+        if (fieldNameFromConfigLower.includes('zone') || fieldNameFromConfigLower.includes('server') || 
+            fieldLabelFromConfigLower.includes('zone') || fieldLabelFromConfigLower.includes('server')) {
+          
           const valueFromAccountDetails = accountDetails[fieldInConfig.name];
           if (valueFromAccountDetails && String(valueFromAccountDetails).trim() !== "") {
             identifiedZoneValue = String(valueFromAccountDetails);
-            break;
+            break; // Found a zone/server ID, use it
           }
         }
       }
     }
-    if (identifiedZoneValue) payload.idZone = identifiedZoneValue;
+    if (identifiedZoneValue) {
+      payload.idZone = identifiedZoneValue;
+    }
+
 
     try {
       const response = await fetch(`${apiUrl}/process-order`, {
@@ -221,24 +250,29 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       const result = await response.json();
 
       if (!response.ok) {
+        // Handle non-OK responses from /process-order (e.g., backend validation error)
         setFeedbackMessage({ type: 'error', text: result.error || result.message || `Gagal proses pesanan (Error: ${response.status})` });
         setIsProcessing(false);
         return;
       }
 
+      // If response is OK, check for DOKU specific outcomes
       if (result.error || (result.message && response.status !== 200 && response.status !== 201 && !result.payment_url)) {
+        // If backend returns an error field or a message that indicates an issue before DOKU URL
         setFeedbackMessage({ type: 'error', text: result.error || result.message });
         setIsProcessing(false);
       } else if (result.payment_url && result.ref_id) {
         const { payment_url, ref_id } = result;
+        // Use DOKU's JS to open the payment popup
         if (typeof window.loadJokulCheckout === 'function') {
           window.loadJokulCheckout(payment_url);
-          startPolling(ref_id);
+          startPolling(ref_id); // Start polling *after* DOKU popup is invoked
         } else {
           setFeedbackMessage({ type: 'error', text: "Gagal memuat popup pembayaran. Fungsi tidak ditemukan." });
-          setIsProcessing(false);
+          setIsProcessing(false); // Stop processing if DOKU lib isn't loaded
         }
       } else {
+        // If response is OK but doesn't have payment_url or ref_id as expected
         setFeedbackMessage({ type: 'error', text: "Respons tidak valid dari server setelah memproses pesanan." });
         setIsProcessing(false);
       }
@@ -267,11 +301,13 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8 p-2">
+      {/* Back Button */}
       <div className="mb-4">
         <Button 
           variant="outline" 
           onClick={() => { 
-            if (!isProcessing || feedbackMessage) { // Allow back if feedback is shown
+            // Allow back if not processing OR if feedback is shown (success or error)
+            if (!isProcessing || feedbackMessage) { 
               if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
               currentRefId.current = null;
               router.back(); 
@@ -279,13 +315,14 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           }} 
           size="sm" 
           className="text-xs sm:text-sm" 
-          disabled={isProcessing && !feedbackMessage}
+          disabled={isProcessing && !feedbackMessage} // Disable only if processing AND no feedback yet
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Kembali
         </Button>
       </div>
       
+      {/* Confirmation Details - Show if no feedback message AND not processing (or processing just started) */}
       {!feedbackMessage && !isProcessing && (
         <>
           <div className="text-center">
@@ -333,10 +370,12 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                 <h3 className="text-xs sm:text-base md:text-lg font-semibold text-primary mb-1">Detail Akun:</h3>
                 <ul className="list-disc list-inside space-y-1 pl-2 bg-muted/30 p-2 sm:p-3 rounded-md text-xs sm:text-sm md:text-base">
                   {Object.entries(accountDetails).map(([key, value]) => {
+                    // Try to get a more user-friendly label
                     let fieldLabel = key;
                     if (key.toLowerCase() === 'username') {
                       fieldLabel = "Nickname";
                     } else {
+                      // Find the label from the game's accountIdFields configuration
                       fieldLabel = selectedGame.accountIdFields.find(f => f.name === key)?.label || key.charAt(0).toUpperCase() + key.slice(1);
                     }
                     return (
@@ -358,6 +397,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         </>
       )}
 
+      {/* Processing Payment - Show if isProcessing AND no feedback message yet */}
       {isProcessing && !feedbackMessage && (
         <div className="flex flex-col items-center justify-center py-10">
           <Card className="my-6 border-primary bg-primary/10 shadow-lg w-full max-w-md">
@@ -376,8 +416,9 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         </div>
       )}
 
+      {/* Feedback Message Card (Success or Error) */}
       {feedbackMessage && (
-         <div className="flex flex-col items-center justify-center py-10">
+         <div className="flex flex-col items-center justify-center py-10"> {/* Ensures centering of the card itself */}
             <Card className={cn(
               "my-6 shadow-xl w-full max-w-lg", // Increased max-w for details
               feedbackMessage.type === 'success' && "border-green-500 bg-green-500/10",
@@ -429,9 +470,9 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                           )}
                       </div>
                   </div>
-                  {Object.entries(accountDetails).map(([key, value]) => {
+                  {accountDetails && Object.entries(accountDetails).map(([key, value]) => {
                      let fieldLabel = key;
-                     if (key.toLowerCase() === 'username') {
+                     if (key.toLowerCase() === 'username') { // Ensure 'username' is consistently handled
                        fieldLabel = "Nickname";
                      } else {
                        fieldLabel = selectedGame.accountIdFields.find(f => f.name === key)?.label || key.charAt(0).toUpperCase() + key.slice(1);
@@ -463,63 +504,38 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                         Lanjut ke Halaman Sukses
                     </Button>
                 )}
-                {feedbackMessage.type === 'error' && (
-                    <Button onClick={() => {
-                        setIsProcessing(false); 
-                        setFeedbackMessage(null);
-                        }} 
-                        variant="outline" 
-                        className="mt-4 w-full sm:w-auto" 
-                        size="sm"
-                    >
-                        Coba Bayar Lagi
-                    </Button>
-                )}
-                 {feedbackMessage.type !== 'success' && (
-                    <Button 
-                        onClick={() => {
-                            if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-                            currentRefId.current = null;
-                            resetPurchase(); // Reset purchase context
-                            router.push('/'); // Navigate to home
-                        }}
-                        variant="ghost" 
-                        className="mt-4 w-full sm:w-auto text-muted-foreground hover:text-foreground" 
-                        size="sm"
-                    >
-                        Batal & Kembali ke Beranda
-                    </Button>
-                )}
+                {/* "Coba Bayar Lagi" button removed from error card */}
+                {/* "Batal & Kembali ke Beranda" button removed from error card */}
               </CardContent>
             </Card>
         </div>
       )}
       
-      {/* Main action button - only show if no final feedback or if error feedback allows retry */}
+      {/* Main action button - only show if no final feedback OR if error feedback allows retry */}
       {(!feedbackMessage || (feedbackMessage && feedbackMessage.type === 'error')) && (
         <Button
           onClick={handleConfirmPurchase}
-          disabled={isProcessing || (feedbackMessage && feedbackMessage.type === 'success')}
+          disabled={isProcessing || (feedbackMessage && feedbackMessage.type === 'success')} // Disable if success message is shown
           size="lg"
           className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm sm:text-base"
         >
-          {isProcessing && !feedbackMessage ? (
+          {isProcessing && !feedbackMessage ? ( // Still processing, no feedback yet
             <>
               <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
               Menunggu Pembayaran...
             </>
-          ) : feedbackMessage && feedbackMessage.type === 'success' ? ( // Should not be visible due to outer condition, but for safety
+          ) : feedbackMessage && feedbackMessage.type === 'success' ? ( // Success feedback is shown, button disabled by outer condition
             <>
               <CheckCircle2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-              Pembayaran Berhasil!
+              Pembayaran Berhasil! 
             </>
-          ) : feedbackMessage && feedbackMessage.type === 'error' ? (
+          ) : feedbackMessage && feedbackMessage.type === 'error' ? ( // Error feedback is shown, allow retry
             <>
               <AlertTriangle className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
               Pembayaran Gagal, Coba Bayar Lagi?
             </>
           )
-          : (
+          : ( // Initial state, no processing, no feedback
             <>
               <CheckCircle2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
               Konfirmasi & Bayar
