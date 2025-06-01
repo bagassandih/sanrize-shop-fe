@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck, Gem, ArrowLeft, Info, PartyPopper } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck, Gem, ArrowLeft, Info, PartyPopper, ShoppingBag } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,7 @@ interface ConfirmationClientProps {
 interface FeedbackMessage {
   type: 'success' | 'error' | 'info';
   text: string;
+  transactionId?: string;
 }
 
 // For DOKU's loadJokulCheckout
@@ -31,7 +32,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   const { selectedGame, selectedPackage, accountDetails, resetPurchase } = usePurchase();
   const [isProcessing, setIsProcessing] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<FeedbackMessage | null>(null);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentRefId = useRef<string | null>(null);
@@ -45,6 +45,11 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     };
   }, []);
 
+  const formatPriceIDR = (price: number | undefined) => {
+    if (price === undefined || price === null) return "Rp 0";
+    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
+  };
+
   const startPolling = useCallback((refIdToCheck: string) => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
@@ -52,7 +57,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     currentRefId.current = refIdToCheck;
 
     const checkStatus = async () => {
-      if (!currentRefId.current) { // Check if polling should even run
+      if (!currentRefId.current) {
         if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
         return;
       }
@@ -76,43 +81,47 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         if (!response.ok) {
           const errorResponseText = await response.text();
           let detailedErrorMessage = `Gagal memeriksa status pembayaran (HTTP ${response.status}).`;
-          try {
-              const errorJson = JSON.parse(errorResponseText);
-              const serverMsg = errorJson.message || errorJson.error;
-              if (serverMsg) {
-                  detailedErrorMessage += ` Pesan: ${serverMsg}`;
-              } else if (errorResponseText.trim() !== '{}' && errorResponseText.trim() !== '') {
-                  detailedErrorMessage += ` Respon server: ${errorResponseText.substring(0,150)}`;
-              }
-          } catch (e) {
-              if (errorResponseText.trim() !== '') {
-                 detailedErrorMessage += ` Respon server (non-JSON): ${errorResponseText.substring(0,150)}`;
-              }
-          }
-          console.warn(`HTTP ${response.status} error from /check-transaction. Response: ${detailedErrorMessage}. Polling continues if relevant.`);
-          // Don't set feedback or stop processing for transient errors if popup might be open
-          // Only stop and show error if it's a persistent issue or user context changes (e.g., navigation)
+           if (response.status !== 404) { // Don't show user error for 404 if popup might be open
+            try {
+                const errorJson = JSON.parse(errorResponseText);
+                const serverMsg = errorJson.message || errorJson.error;
+                if (serverMsg) {
+                    detailedErrorMessage += ` Pesan: ${serverMsg}`;
+                } else if (errorResponseText.trim() !== '{}' && errorResponseText.trim() !== '') {
+                    detailedErrorMessage += ` Respon server: ${errorResponseText.substring(0,150)}`;
+                }
+            } catch (e) {
+                if (errorResponseText.trim() !== '') {
+                   detailedErrorMessage += ` Respon server (non-JSON): ${errorResponseText.substring(0,150)}`;
+                }
+            }
+            console.warn(`HTTP ${response.status} error from /check-transaction. Response: ${detailedErrorMessage}. Polling continues if relevant.`);
+             // Only set feedback and stop if it's a persistent issue or user context changes (e.g., DOKU window closed, or non-404 error)
+             // For now, we let polling continue for non-404 errors if DOKU window might be open,
+             // but this could be refined if DOKU popup isn't directly checkable.
+             // The feedback will be set only if polling stops due to a definitive status or other condition.
+           } else {
+             console.log("HTTP 404: Transaction not found yet, continuing poll as DOKU popup might be open.");
+           }
           return;
         }
 
         const data = await response.json();
 
-        if (!data.transaction || !data.transaction.status) {
-          console.warn("Format respons /check-transaction tidak valid. 'transaction.status' tidak ditemukan. Respons:", data);
-          // Continue polling if format is weird but popup might still be active
+        if (!data.transaction || typeof data.transaction.status === 'undefined') {
+          console.warn("Format respons /check-transaction tidak valid. 'transaction.status' tidak ditemukan atau undefined. Respons:", data);
           return;
         }
 
-        const transactionStatus = data.transaction.status;
+        const transactionStatus = String(data.transaction.status).toUpperCase();
         const originalReqId = data.transaction.original_request_id || currentRefId.current;
 
         if (transactionStatus === 'SUCCESS') {
           if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
           currentRefId.current = null;
-          setFeedbackMessage({ type: 'success', text: `Asiiik, pembayaran berhasil! ID Transaksi: ${originalReqId}. Item akan segera dikirim ke akunmu.` });
-          setShowSuccessMessage(true);
+          setFeedbackMessage({ type: 'success', text: `Asiiik, pembayaran berhasil! Item akan segera dikirim ke akunmu.`, transactionId: originalReqId });
           setIsProcessing(false);
-          // resetPurchase(); // Consider when to reset, maybe on navigating away or new purchase
+          // No automatic redirect
         } else if (['EXPIRED', 'FAILED', 'CANCELLED'].includes(transactionStatus)) {
           if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
           currentRefId.current = null;
@@ -120,13 +129,12 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           if (statusText === 'failed') statusText = 'gagal';
           if (statusText === 'expired') statusText = 'kedaluwarsa';
           if (statusText === 'cancelled') statusText = 'dibatalkan';
-          setFeedbackMessage({ type: 'error', text: `Yah, pembayaran kamu ${statusText}. ID Transaksi: ${originalReqId}. Mau coba lagi atau kontak support aja?` });
+          setFeedbackMessage({ type: 'error', text: `Yah, pembayaran kamu ${statusText}. Mau coba lagi atau kontak support aja?`, transactionId: originalReqId });
           setIsProcessing(false);
         } else if (transactionStatus === 'PENDING') {
           console.log('Payment pending, continuing to poll...');
         } else {
           console.warn("Unknown transaction status from API:", transactionStatus, " - Full Response:", data);
-          // Continue polling if unknown status
         }
       } catch (error: any) {
         console.error("Error during polling (checkStatus catch block):", error);
@@ -136,18 +144,17 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
            setFeedbackMessage({ type: 'error', text: "Waduh, koneksi internetnya putus. Cek jaringanmu dulu ya."});
            setIsProcessing(false);
         } else {
-          console.warn(`Network or other technical issue during polling. Error: ${error.message || 'Error tidak diketahui'}. Polling continues.`);
+          console.warn(`Network or other technical issue during polling. Error: ${error.message || 'Error tidak diketahui'}. Polling continues if DOKU window might be open.`);
         }
       }
     };
 
     pollingIntervalRef.current = setInterval(checkStatus, 3000);
-    setTimeout(checkStatus, 1500); // Initial check slightly delayed
-
-  }, [apiUrl, feedbackMessage, resetPurchase]); // Added feedbackMessage for re-renders
+    checkStatus(); // Initial check immediately
+  }, [apiUrl, feedbackMessage, resetPurchase, selectedGame, selectedPackage, accountDetails]);
 
   const handleConfirmPurchase = async () => {
-    if (pollingIntervalRef.current) { // Clear any existing polling before starting a new one
+    if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
@@ -160,7 +167,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 
     setIsProcessing(true);
     setFeedbackMessage(null);
-    setShowSuccessMessage(false);
 
     const primaryAccountIdField = selectedGame.accountIdFields[0]?.name;
     const idGameValue = primaryAccountIdField ? accountDetails[primaryAccountIdField] : undefined;
@@ -243,10 +249,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     }
   };
 
-  const formatPriceIDR = (price: number) => {
-    if (price === undefined || price === null) return "Rp 0";
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
-  };
 
   if (!selectedGame || !selectedPackage || !accountDetails) {
     return (
@@ -269,7 +271,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         <Button 
           variant="outline" 
           onClick={() => { 
-            if (!isProcessing) {
+            if (!isProcessing || feedbackMessage) { // Allow back if feedback is shown
               if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
               currentRefId.current = null;
               router.back(); 
@@ -358,15 +360,15 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 
       {isProcessing && !feedbackMessage && (
         <div className="flex flex-col items-center justify-center py-10">
-          <Card className="my-6 border-blue-500 bg-blue-500/10 shadow-lg w-full max-w-md">
+          <Card className="my-6 border-primary bg-primary/10 shadow-lg w-full max-w-md">
             <CardHeader className="flex flex-col items-center text-center space-y-3 p-4 sm:p-6">
-              <Loader2 className="h-10 w-10 sm:h-12 sm:h-12 text-blue-500 animate-spin" />
-              <CardTitle className="text-lg sm:text-xl md:text-2xl text-blue-700 dark:text-blue-400">
+              <Loader2 className="h-10 w-10 sm:h-12 sm:h-12 text-primary animate-spin" />
+              <CardTitle className="text-lg sm:text-xl md:text-2xl text-primary">
                 Sedang Memproses...
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 sm:p-6 pt-0 text-center">
-              <p className="text-sm sm:text-base text-blue-600 dark:text-blue-300">
+              <p className="text-sm sm:text-base text-muted-foreground">
                 Sabar ya, status pembayaranmu lagi dicek nih. Mohon jangan refresh atau tutup halaman ini. Popup pembayaran akan muncul atau status akan diperbarui.
               </p>
             </CardContent>
@@ -377,7 +379,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       {feedbackMessage && (
          <div className="flex flex-col items-center justify-center py-10">
             <Card className={cn(
-              "my-6 shadow-lg w-full max-w-md",
+              "my-6 shadow-xl w-full max-w-lg", // Increased max-w for details
               feedbackMessage.type === 'success' && "border-green-500 bg-green-500/10",
               feedbackMessage.type === 'error' && "border-destructive bg-destructive/10",
               feedbackMessage.type === 'info' && "border-sky-500 bg-sky-500/10"
@@ -404,23 +406,88 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                 )}>
                   {feedbackMessage.text}
                 </p>
+
+                {/* Transaction Details Section */}
+                <div className="text-left text-xs sm:text-sm bg-muted/30 p-3 sm:p-4 rounded-md my-4 space-y-1">
+                  <h4 className="font-semibold text-primary mb-2 text-sm sm:text-base">Detail Transaksi:</h4>
+                  {feedbackMessage.transactionId && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">ID Transaksi:</span>
+                      <span className="font-medium text-foreground">{feedbackMessage.transactionId}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Game:</span>
+                    <span className="font-medium text-foreground">{selectedGame.name}</span>
+                  </div>
+                  <div className="flex justify-between items-start">
+                      <span className="text-muted-foreground pt-0.5">Paket:</span>
+                      <div className="text-right">
+                          <span className="font-medium text-foreground block">{selectedPackage.name}</span>
+                          {selectedPackage.bonus && String(selectedPackage.bonus).trim() !== "" && (
+                              <span className="text-xs text-accent block">Bonus: {String(selectedPackage.bonus)}</span>
+                          )}
+                      </div>
+                  </div>
+                  {Object.entries(accountDetails).map(([key, value]) => {
+                     let fieldLabel = key;
+                     if (key.toLowerCase() === 'username') {
+                       fieldLabel = "Nickname";
+                     } else {
+                       fieldLabel = selectedGame.accountIdFields.find(f => f.name === key)?.label || key.charAt(0).toUpperCase() + key.slice(1);
+                     }
+                     return (
+                        <div className="flex justify-between" key={key}>
+                            <span className="text-muted-foreground">{fieldLabel}:</span>
+                            <span className="font-medium text-foreground">{String(value)}</span>
+                        </div>
+                     );
+                  })}
+                  <div className="flex justify-between border-t border-border pt-2 mt-2">
+                      <span className="text-muted-foreground text-sm sm:text-base">Total Bayar:</span>
+                      <span className="font-bold text-accent text-sm sm:text-base">{formatPriceIDR(selectedPackage.price)}</span>
+                  </div>
+                </div>
+                {/* End Transaction Details Section */}
+
                 {feedbackMessage.type === 'success' && (
-                    <Button onClick={() => router.push('/success')} className="mt-4 w-full sm:w-auto" size="sm">
-                        Lihat Detail Pesanan
+                    <Button 
+                      onClick={() => {
+                        resetPurchase();
+                        router.push('/success');
+                      }} 
+                      className="mt-4 w-full sm:w-auto bg-green-600 hover:bg-green-700" 
+                      size="sm"
+                    >
+                        <ShoppingBag className="mr-2 h-4 w-4" />
+                        Lanjut ke Halaman Sukses
                     </Button>
                 )}
                 {feedbackMessage.type === 'error' && (
                     <Button onClick={() => {
                         setIsProcessing(false); 
                         setFeedbackMessage(null);
-                        setShowSuccessMessage(false);
-                        // Don't clear pollingIntervalRef here, handleConfirmPurchase will do it if user retries
                         }} 
                         variant="outline" 
                         className="mt-4 w-full sm:w-auto" 
                         size="sm"
                     >
-                        Coba Lagi
+                        Coba Bayar Lagi
+                    </Button>
+                )}
+                 {feedbackMessage.type !== 'success' && (
+                    <Button 
+                        onClick={() => {
+                            if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                            currentRefId.current = null;
+                            resetPurchase(); // Reset purchase context
+                            router.push('/'); // Navigate to home
+                        }}
+                        variant="ghost" 
+                        className="mt-4 w-full sm:w-auto text-muted-foreground hover:text-foreground" 
+                        size="sm"
+                    >
+                        Batal & Kembali ke Beranda
                     </Button>
                 )}
               </CardContent>
@@ -428,11 +495,11 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         </div>
       )}
       
-      {/* Tombol utama hanya tampil jika tidak ada feedback final atau sedang tidak loading */}
-      {(!feedbackMessage || (feedbackMessage && feedbackMessage.type !== 'success')) && (
+      {/* Main action button - only show if no final feedback or if error feedback allows retry */}
+      {(!feedbackMessage || (feedbackMessage && feedbackMessage.type === 'error')) && (
         <Button
           onClick={handleConfirmPurchase}
-          disabled={isProcessing || showSuccessMessage}
+          disabled={isProcessing || (feedbackMessage && feedbackMessage.type === 'success')}
           size="lg"
           className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm sm:text-base"
         >
@@ -441,7 +508,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
               <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
               Menunggu Pembayaran...
             </>
-          ) : showSuccessMessage ? (
+          ) : feedbackMessage && feedbackMessage.type === 'success' ? ( // Should not be visible due to outer condition, but for safety
             <>
               <CheckCircle2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
               Pembayaran Berhasil!
@@ -449,7 +516,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           ) : feedbackMessage && feedbackMessage.type === 'error' ? (
             <>
               <AlertTriangle className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-              Pembayaran Gagal, Coba Lagi?
+              Pembayaran Gagal, Coba Bayar Lagi?
             </>
           )
           : (
@@ -465,5 +532,3 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 };
 
 export default ConfirmationClient;
-
-    
