@@ -153,7 +153,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       checkStatus(); 
       pollingIntervalRef.current = setInterval(checkStatus, 5000);
     }, 2000);
-  }, [apiUrl, feedbackMessage]);
+  }, [apiUrl, feedbackMessage]); // feedbackMessage dependency means polling might re-evaluate if feedback changes, generally ok.
 
   const handleConfirmPurchase = async () => {
     if (pollingIntervalRef.current) {
@@ -469,6 +469,16 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                     </Button>
                     <Button
                       onClick={() => {
+                        // Explicitly stop any ongoing polling and clear the reference ID
+                        // related to the previous failed attempt before starting a new one.
+                        // handleConfirmPurchase also performs this, but adding it here
+                        // makes the "new transaction" intent from this button click more explicit.
+                        if (pollingIntervalRef.current) {
+                          clearInterval(pollingIntervalRef.current);
+                          pollingIntervalRef.current = null;
+                        }
+                        currentRefId.current = null;
+                        
                         setFeedbackMessage(null); 
                         handleConfirmPurchase();
                       }}
