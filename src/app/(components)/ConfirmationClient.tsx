@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck, Gem, ArrowLeft, Info, PartyPopper, ShoppingBag } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck, Gem, ArrowLeft, Info, PartyPopper, ShoppingBag, RefreshCw } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from "@/lib/utils";
 
@@ -20,7 +20,6 @@ interface FeedbackMessage {
   transactionId?: string;
 }
 
-// For DOKU's loadJokulCheckout
 declare global {
   interface Window {
     loadJokulCheckout?: (paymentUrl: string) => void;
@@ -37,7 +36,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   const currentRefId = useRef<string | null>(null);
 
   useEffect(() => {
-    // Cleanup interval on component unmount
     return () => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
@@ -95,15 +93,26 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                  detailedErrorMessage += ` Respon server (non-JSON): ${errorResponseText.substring(0,150)}`;
               }
           }
+          
           console.warn(`Error from /check-transaction: ${detailedErrorMessage}. Ref ID: ${currentRefId.current}. Polling continues if DOKU popup might be open.`);
-          // No explicit action to stop polling or set user-facing error here if popup is open
+          // Do not stop polling or set user-facing error here if DOKU popup might still be open
+          // and the error is not a definitive failure from our side.
+          // If user closes popup, that will be handled.
+          if (!navigator.onLine) { // Specific case for offline
+             if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+             currentRefId.current = null;
+             if (!feedbackMessage || feedbackMessage.type !== 'success') {
+               setFeedbackMessage({ type: 'error', text: "Waduh, koneksi internetnya putus. Cek jaringanmu dulu ya."});
+             }
+             setIsProcessing(false);
+          }
           return; 
         }
 
         const data = await response.json();
 
         if (!data.transaction || typeof data.transaction.status === 'undefined') {
-          console.warn("Format respons /check-transaction tidak valid. 'transaction.status' tidak ditemukan atau undefined. Respons:", data, "Polling continues if DOKU popup might be open.");
+          console.warn("Format respons /check-transaction tidak valid. 'transaction.status' tidak ditemukan. Respons:", data, "Polling berlanjut.");
           return;
         }
         
@@ -122,15 +131,15 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           if (statusText === 'failed') statusText = 'gagal';
           if (statusText === 'expired') statusText = 'kedaluwarsa';
           if (statusText === 'cancelled') statusText = 'dibatalkan';
-          setFeedbackMessage({ type: 'error', text: `Yah, pembayaran kamu ${statusText}. ID Transaksi: ${originalReqId}.`, transactionId: originalReqId });
+          setFeedbackMessage({ type: 'error', text: `Yah, pembayaran kamu ${statusText}.`, transactionId: originalReqId });
           setIsProcessing(false);
         } else if (transactionStatus === 'PENDING') {
-          console.log('Payment pending, continuing to poll...');
+          console.log('Status pembayaran: PENDING. Melanjutkan polling...');
         } else {
-          console.warn("Unknown transaction status from API:", transactionStatus, " - Full Response:", data, "Polling continues if DOKU popup might be open.");
+          console.warn("Status transaksi tidak diketahui dari API:", transactionStatus, " - Respons Penuh:", data, "Polling berlanjut.");
         }
       } catch (error: any) {
-        console.error("Error during polling (checkStatus catch block):", error);
+        console.error("Error saat polling (blok catch checkStatus):", error);
         if (!navigator.onLine) {
            if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
            currentRefId.current = null;
@@ -139,23 +148,24 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
            }
            setIsProcessing(false);
         } else {
-          console.warn(`Network or other technical issue during polling. Error: ${error.message || 'Error tidak diketahui'}. Polling continues if DOKU window might be open.`);
+          console.warn(`Masalah jaringan atau teknis lainnya saat polling. Error: ${error.message || 'Error tidak diketahui'}. Polling berlanjut.`);
         }
       }
     };
 
+    // Initial check with a slight delay, then interval
     setTimeout(() => {
-      checkStatus();
-      pollingIntervalRef.current = setInterval(checkStatus, 5000);
-    }, 2000);
-  }, [apiUrl, feedbackMessage, selectedGame, selectedPackage, accountDetails]); // Removed resetPurchase, as it's handled differently now.
+      checkStatus(); // Initial check
+      pollingIntervalRef.current = setInterval(checkStatus, 5000); // Poll every 5 seconds
+    }, 2000); // Delay initial check by 2s
+  }, [apiUrl, feedbackMessage]);
 
   const handleConfirmPurchase = async () => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
-    currentRefId.current = null;
+    currentRefId.current = null; // Reset ref_id before a new attempt
 
     if (!selectedGame || !selectedPackage || !accountDetails || !apiUrl) {
       setFeedbackMessage({ type: 'error', text: "Waduh, info pembeliannya kurang lengkap atau API-nya lagi ngambek nih." });
@@ -163,7 +173,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     }
 
     setIsProcessing(true);
-    setFeedbackMessage(null); 
+    setFeedbackMessage(null); // Clear previous feedback
 
     const primaryAccountIdField = selectedGame.accountIdFields[0]?.name;
     const idGameValue = primaryAccountIdField ? accountDetails[primaryAccountIdField] : undefined;
@@ -192,10 +202,11 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     
     let identifiedZoneValue: string | undefined = undefined;
     const mainIdFieldNameFromGameConfig = selectedGame.accountIdFields[0]?.name;
+
     if (accountDetails) {
       for (const fieldInConfig of selectedGame.accountIdFields) {
         if (mainIdFieldNameFromGameConfig && fieldInConfig.name === mainIdFieldNameFromGameConfig) continue;
-        if (fieldInConfig.name.toLowerCase() === 'username') continue;
+        if (fieldInConfig.name.toLowerCase() === 'username') continue; // Username is already handled
 
         const fieldNameFromConfigLower = fieldInConfig.name.toLowerCase();
         const fieldLabelFromConfigLower = fieldInConfig.label.toLowerCase();
@@ -211,6 +222,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         }
       }
     }
+
     if (identifiedZoneValue) {
       payload.idZone = identifiedZoneValue;
     }
@@ -236,7 +248,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         const { payment_url, ref_id } = result;
         if (typeof window.loadJokulCheckout === 'function') {
           window.loadJokulCheckout(payment_url);
-          startPolling(ref_id); 
+          startPolling(ref_id); // Start polling after DOKU popup is initiated
         } else {
           setFeedbackMessage({ type: 'error', text: "Gagal memuat popup pembayaran. Fungsi tidak ditemukan." });
           setIsProcessing(false); 
@@ -269,24 +281,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8 p-2">
-      <div className="mb-4">
-        <Button 
-          variant="outline" 
-          onClick={() => { 
-            if (!isProcessing || feedbackMessage) { 
-              if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-              currentRefId.current = null;
-              router.back(); 
-            }
-          }} 
-          size="sm" 
-          className="text-xs sm:text-sm" 
-          disabled={isProcessing && !feedbackMessage}
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Kembali
-        </Button>
-      </div>
+      {/* Tombol Kembali yang di atas sudah dihapus */}
       
       {!feedbackMessage && !isProcessing && (
         <>
@@ -464,23 +459,40 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                     </Button>
                 )}
                 {feedbackMessage.type === 'error' && (
-                  <Button
-                    onClick={() => {
-                      setFeedbackMessage(null); 
-                      handleConfirmPurchase();
-                    }}
-                    className="mt-6 w-full sm:w-auto bg-primary hover:bg-primary/90"
-                    size="sm"
-                  >
-                    <AlertTriangle className="mr-2 h-4 w-4" />
-                    Coba Bayar Lagi
-                  </Button>
+                  <div className="mt-6 flex flex-col sm:flex-row sm:justify-center sm:space-x-4 space-y-3 sm:space-y-0">
+                    <Button
+                      onClick={() => {
+                        setFeedbackMessage(null); 
+                        handleConfirmPurchase();
+                      }}
+                      className="w-full sm:w-auto bg-primary hover:bg-primary/90"
+                      size="sm"
+                    >
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Coba Bayar Lagi
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                        currentRefId.current = null;
+                        // resetPurchase(); // Consider if reset is needed before just going back
+                        router.back(); 
+                      }}
+                      className="w-full sm:w-auto"
+                      size="sm"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Kembali
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
         </div>
       )}
       
+      {/* Tombol Konfirmasi & Bayar utama hanya muncul jika tidak ada feedback atau sedang tidak proses */}
       {!feedbackMessage && !isProcessing && (
         <Button
           onClick={handleConfirmPurchase}
@@ -497,5 +509,3 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 };
 
 export default ConfirmationClient;
-
-    
