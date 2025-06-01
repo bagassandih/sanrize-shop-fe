@@ -346,6 +346,15 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
               </div>
             </CardContent>
           </Card>
+           <Button
+              onClick={handleConfirmPurchase}
+              disabled={isProcessing} 
+              size="lg"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm sm:text-base mt-6"
+            >
+              <CheckCircle2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+              Konfirmasi & Bayar
+            </Button>
         </>
       )}
 
@@ -459,20 +468,18 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                       onClick={() => {
                         if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
                         currentRefId.current = null;
-                        router.back(); 
+                        resetPurchase(); 
+                        router.push('/'); 
                       }}
                       className="w-full sm:w-auto"
                       size="sm"
                     >
                       <ArrowLeft className="mr-2 h-4 w-4" />
-                      Kembali
+                      Kembali ke Beranda
                     </Button>
                     <Button
                       onClick={() => {
-                        // Explicitly stop any ongoing polling and clear the reference ID
-                        // related to the previous failed attempt before starting a new one.
-                        // handleConfirmPurchase also performs this, but adding it here
-                        // makes the "new transaction" intent from this button click more explicit.
+                        setIsProcessing(true); // Immediately set processing state for UI feedback
                         if (pollingIntervalRef.current) {
                           clearInterval(pollingIntervalRef.current);
                           pollingIntervalRef.current = null;
@@ -494,21 +501,10 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
             </Card>
         </div>
       )}
-      
-      {!feedbackMessage && !isProcessing && (
-        <Button
-          onClick={handleConfirmPurchase}
-          disabled={isProcessing} 
-          size="lg"
-          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm sm:text-base mt-6"
-        >
-          <CheckCircle2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-          Konfirmasi & Bayar
-        </Button>
-      )}
     </div>
   );
 };
 
 export default ConfirmationClient;
 
+    
