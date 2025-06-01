@@ -95,10 +95,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           }
           
           console.warn(`Error from /check-transaction: ${detailedErrorMessage}. Ref ID: ${currentRefId.current}. Polling continues if DOKU popup might be open.`);
-          // Do not stop polling or set user-facing error here if DOKU popup might still be open
-          // and the error is not a definitive failure from our side.
-          // If user closes popup, that will be handled.
-          if (!navigator.onLine) { // Specific case for offline
+          if (!navigator.onLine) { 
              if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
              currentRefId.current = null;
              if (!feedbackMessage || feedbackMessage.type !== 'success') {
@@ -152,12 +149,10 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         }
       }
     };
-
-    // Initial check with a slight delay, then interval
     setTimeout(() => {
-      checkStatus(); // Initial check
-      pollingIntervalRef.current = setInterval(checkStatus, 5000); // Poll every 5 seconds
-    }, 2000); // Delay initial check by 2s
+      checkStatus(); 
+      pollingIntervalRef.current = setInterval(checkStatus, 5000);
+    }, 2000);
   }, [apiUrl, feedbackMessage]);
 
   const handleConfirmPurchase = async () => {
@@ -165,7 +160,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
-    currentRefId.current = null; // Reset ref_id before a new attempt
+    currentRefId.current = null; 
 
     if (!selectedGame || !selectedPackage || !accountDetails || !apiUrl) {
       setFeedbackMessage({ type: 'error', text: "Waduh, info pembeliannya kurang lengkap atau API-nya lagi ngambek nih." });
@@ -173,7 +168,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     }
 
     setIsProcessing(true);
-    setFeedbackMessage(null); // Clear previous feedback
+    setFeedbackMessage(null); 
 
     const primaryAccountIdField = selectedGame.accountIdFields[0]?.name;
     const idGameValue = primaryAccountIdField ? accountDetails[primaryAccountIdField] : undefined;
@@ -206,7 +201,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     if (accountDetails) {
       for (const fieldInConfig of selectedGame.accountIdFields) {
         if (mainIdFieldNameFromGameConfig && fieldInConfig.name === mainIdFieldNameFromGameConfig) continue;
-        if (fieldInConfig.name.toLowerCase() === 'username') continue; // Username is already handled
+        if (fieldInConfig.name.toLowerCase() === 'username') continue; 
 
         const fieldNameFromConfigLower = fieldInConfig.name.toLowerCase();
         const fieldLabelFromConfigLower = fieldInConfig.label.toLowerCase();
@@ -248,7 +243,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         const { payment_url, ref_id } = result;
         if (typeof window.loadJokulCheckout === 'function') {
           window.loadJokulCheckout(payment_url);
-          startPolling(ref_id); // Start polling after DOKU popup is initiated
+          startPolling(ref_id); 
         } else {
           setFeedbackMessage({ type: 'error', text: "Gagal memuat popup pembayaran. Fungsi tidak ditemukan." });
           setIsProcessing(false); 
@@ -281,7 +276,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8 p-2">
-      {/* Tombol Kembali yang di atas sudah dihapus */}
       
       {!feedbackMessage && !isProcessing && (
         <>
@@ -404,8 +398,8 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                   {feedbackMessage.text}
                 </p>
 
-                <div className="text-left text-xs sm:text-sm bg-muted/30 p-3 sm:p-4 rounded-md my-4 space-y-1">
-                  <h4 className="font-semibold text-primary mb-2 text-sm sm:text-base">Detail Transaksi:</h4>
+                <div className="text-left text-sm sm:text-base bg-muted/30 p-3 sm:p-4 rounded-md my-4 space-y-1.5">
+                  <h4 className="font-semibold text-primary mb-2 text-base sm:text-lg">Detail Transaksi:</h4>
                   {feedbackMessage.transactionId && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">ID Transaksi:</span>
@@ -440,8 +434,8 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                      );
                   })}
                   <div className="flex justify-between border-t border-border pt-2 mt-2">
-                      <span className="text-muted-foreground text-sm sm:text-base">Total Bayar:</span>
-                      <span className="font-bold text-accent text-sm sm:text-base">{formatPriceIDR(selectedPackage.price)}</span>
+                      <span className="text-muted-foreground text-base sm:text-lg">Total Bayar:</span>
+                      <span className="font-bold text-accent text-base sm:text-lg">{formatPriceIDR(selectedPackage.price)}</span>
                   </div>
                 </div>
                 
@@ -461,6 +455,19 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                 {feedbackMessage.type === 'error' && (
                   <div className="mt-6 flex flex-col sm:flex-row sm:justify-center sm:space-x-4 space-y-3 sm:space-y-0">
                     <Button
+                      variant="outline"
+                      onClick={() => {
+                        if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                        currentRefId.current = null;
+                        router.back(); 
+                      }}
+                      className="w-full sm:w-auto"
+                      size="sm"
+                    >
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Kembali
+                    </Button>
+                    <Button
                       onClick={() => {
                         setFeedbackMessage(null); 
                         handleConfirmPurchase();
@@ -471,20 +478,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                       <RefreshCw className="mr-2 h-4 w-4" />
                       Coba Bayar Lagi
                     </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-                        currentRefId.current = null;
-                        // resetPurchase(); // Consider if reset is needed before just going back
-                        router.back(); 
-                      }}
-                      className="w-full sm:w-auto"
-                      size="sm"
-                    >
-                      <ArrowLeft className="mr-2 h-4 w-4" />
-                      Kembali
-                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -492,7 +485,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         </div>
       )}
       
-      {/* Tombol Konfirmasi & Bayar utama hanya muncul jika tidak ada feedback atau sedang tidak proses */}
       {!feedbackMessage && !isProcessing && (
         <Button
           onClick={handleConfirmPurchase}
@@ -509,3 +501,4 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 };
 
 export default ConfirmationClient;
+
