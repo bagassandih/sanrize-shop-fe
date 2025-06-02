@@ -4,6 +4,8 @@ import DiamondPackagesClient from '@/app/(components)/DiamondPackagesClient';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 
+export const runtime = 'edge';
+
 interface ApiServiceItem {
   id: number;
   created_at: string;
