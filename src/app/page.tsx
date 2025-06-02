@@ -3,6 +3,8 @@ import GameSelectionClient from '@/app/(components)/GameSelectionClient';
 import HowToOrderSection from '@/app/(components)/HowToOrderSection';
 import type { Game, AccountIdField } from '@/lib/data'; 
 
+export const runtime = 'edge';
+
 interface ApiCategoryItem {
   id: number; 
   created_at: string;
