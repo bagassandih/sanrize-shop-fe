@@ -140,7 +140,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       checkStatus();
       pollingIntervalRef.current = setInterval(checkStatus, 15000);
     }, 2000);
-  }, [apiUrl, feedbackMessage, startPolling]);
+  }, [apiUrl, feedbackMessage, setFeedbackMessage, setIsProcessing]);
 
 
   const handleConfirmPurchase = async () => {
@@ -249,14 +249,14 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   };
 
   const handleRetryPayment = () => {
-    setIsProcessing(true); // Give immediate feedback
+    setIsProcessing(true); 
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
     currentRefId.current = null;
     setFeedbackMessage(null);
-    handleConfirmPurchase(); // This will set isProcessing to true again, but it's fine.
+    handleConfirmPurchase();
   };
 
   const handleGoBack = () => {
