@@ -63,7 +63,10 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       try {
         const response = await fetch(`${apiUrl}/check-transaction`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Origin': window.location.origin,
+          },
           body: JSON.stringify({ refId: currentRefId.current }),
           mode: 'cors',
         });
@@ -211,7 +214,10 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     try {
       const response = await fetch(`${apiUrl}/process-order`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Origin': window.location.origin,
+        },
         body: JSON.stringify(payload),
         mode: 'cors',
       });
@@ -246,7 +252,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   };
   
   const handleRetryPayment = () => {
-    setIsProcessing(true); 
+    setIsProcessing(true);
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
@@ -392,5 +398,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 };
 
 export default ConfirmationClient;
+
+    
 
     
