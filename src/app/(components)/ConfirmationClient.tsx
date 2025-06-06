@@ -65,6 +65,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refId: currentRefId.current }),
+          mode: 'cors',
         });
 
         if (!response.ok) {
@@ -136,7 +137,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     };
     setTimeout(() => {
       checkStatus(); 
-      pollingIntervalRef.current = setInterval(checkStatus, 15000); // Changed from 5000 to 15000
+      pollingIntervalRef.current = setInterval(checkStatus, 15000);
     }, 2000);
   }, [apiUrl, feedbackMessage]);
 
@@ -212,6 +213,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        mode: 'cors',
       });
       const result = await response.json();
 
@@ -244,7 +246,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   };
   
   const handleRetryPayment = () => {
-    setIsProcessing(true);
+    setIsProcessing(true); 
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
@@ -390,3 +392,5 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 };
 
 export default ConfirmationClient;
+
+    

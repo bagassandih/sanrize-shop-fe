@@ -116,6 +116,7 @@ const DiamondPackagesClient = ({ game, apiUrl }: DiamondPackagesClientProps) => 
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
+        mode: 'cors',
       });
 
       const result = await response.json();
@@ -135,7 +136,6 @@ const DiamondPackagesClient = ({ game, apiUrl }: DiamondPackagesClientProps) => 
         setAccountCheckError("Format respons tidak dikenal dari server.");
       }
     } catch (error) {
-      // console.error("Error saat memeriksa akun:", error);
       setAccountCheckError("Tidak dapat terhubung ke server untuk memeriksa akun. Coba lagi nanti.");
     } finally {
       setIsCheckingAccount(false);
