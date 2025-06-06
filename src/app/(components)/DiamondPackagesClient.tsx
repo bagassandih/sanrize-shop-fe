@@ -135,7 +135,7 @@ const DiamondPackagesClient = ({ game, apiUrl }: DiamondPackagesClientProps) => 
         setAccountCheckError("Format respons tidak dikenal dari server.");
       }
     } catch (error) {
-      console.error("Error saat memeriksa akun:", error);
+      // console.error("Error saat memeriksa akun:", error);
       setAccountCheckError("Tidak dapat terhubung ke server untuk memeriksa akun. Coba lagi nanti.");
     } finally {
       setIsCheckingAccount(false);

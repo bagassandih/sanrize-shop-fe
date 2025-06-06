@@ -21,7 +21,7 @@ async function getGames(): Promise<Game[]> {
   const apiUrl = process.env.BASE_API_URL;
 
   if (!apiUrl) {
-    console.error("BASE_API_URL tidak terdefinisi di file .env");
+    // console.error("BASE_API_URL tidak terdefinisi di file .env");
     return [];
   }
 
@@ -31,9 +31,9 @@ async function getGames(): Promise<Game[]> {
     });
 
     if (!res.ok) {
-      console.error(`Gagal mengambil data kategori game: ${res.status} ${res.statusText}`);
-      const errorBody = await res.text();
-      console.error("Error body:", errorBody);
+      // console.error(`Gagal mengambil data kategori game: ${res.status} ${res.statusText}`);
+      // const errorBody = await res.text(); // Kept if errorBody is used elsewhere, otherwise remove
+      // console.error("Error body:", errorBody);
       return [];
     }
 
@@ -43,7 +43,7 @@ async function getGames(): Promise<Game[]> {
     const categories: ApiCategoryItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
 
     if (!Array.isArray(categories)) {
-        console.error("Format respons API kategori tidak valid, diharapkan array atau objek dengan properti data array. Diterima:", apiResponse);
+        // console.error("Format respons API kategori tidak valid, diharapkan array atau objek dengan properti data array. Diterima:", apiResponse);
         return [];
     }
 
@@ -68,7 +68,7 @@ async function getGames(): Promise<Game[]> {
         };
       });
   } catch (error) {
-    console.error("Terjadi kesalahan saat mengambil data kategori game:", error);
+    // console.error("Terjadi kesalahan saat mengambil data kategori game:", error);
     return [];
   }
 }
@@ -82,3 +82,4 @@ export default async function HomePage() {
     </div>
   );
 }
+

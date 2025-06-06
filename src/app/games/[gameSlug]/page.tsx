@@ -34,7 +34,7 @@ interface ApiCategoryItem {
 async function getPackagesForGame(categoryId: number, gameSlug: string): Promise<DiamondPackage[]> {
   const apiUrl = process.env.BASE_API_URL;
   if (!apiUrl) {
-    console.error("BASE_API_URL tidak terdefinisi untuk mengambil paket.");
+    // console.error("BASE_API_URL tidak terdefinisi untuk mengambil paket.");
     return [];
   }
 
@@ -49,9 +49,9 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
     });
 
     if (!res.ok) {
-      console.error(`Gagal mengambil paket untuk kategori ${categoryId}: ${res.status} ${res.statusText}`);
-      const errorBody = await res.text();
-      console.error("Error body:", errorBody);
+      // console.error(`Gagal mengambil paket untuk kategori ${categoryId}: ${res.status} ${res.statusText}`);
+      // const errorBody = await res.text(); // Kept if errorBody is used elsewhere, otherwise remove
+      // console.error("Error body:", errorBody);
       return [];
     }
 
@@ -59,7 +59,7 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
     const serviceItems: ApiServiceItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
 
     if (!Array.isArray(serviceItems)) {
-        console.error("Format respons API service tidak valid, diharapkan array. Diterima:", apiResponse);
+        // console.error("Format respons API service tidak valid, diharapkan array. Diterima:", apiResponse);
         return [];
     }
 
@@ -76,7 +76,7 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
         diamonds: undefined, // Can be parsed if needed, but name usually contains it
       }));
   } catch (error) {
-    console.error(`Error fetching packages for category ${categoryId}:`, error);
+    // console.error(`Error fetching packages for category ${categoryId}:`, error);
     return [];
   }
 }
@@ -104,7 +104,7 @@ export async function generateMetadata({ params: routeParams }: Props): Promise<
         }
       }
     } catch (error) {
-      console.warn(`Tidak dapat mengambil detail kategori untuk metadata slug ${lowerCaseGameSlug}:`, error);
+      // console.warn(`Tidak dapat mengambil detail kategori untuk metadata slug ${lowerCaseGameSlug}:`, error);
     }
   }
 
@@ -133,21 +133,21 @@ export default async function GamePackagesPage({ params }: Props) {
         const categories: ApiCategoryItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
         gameFromApi = categories.find(cat => cat.code.toLowerCase() === gameSlug && cat.status === 'active');
       } else {
-        console.error(`Gagal mengambil data kategori dari API: ${res.status}. Slug: ${gameSlug}`);
+        // console.error(`Gagal mengambil data kategori dari API: ${res.status}. Slug: ${gameSlug}`);
       }
     } catch (error) {
-      console.error(`Error mengambil data kategori dari API untuk slug ${gameSlug}:`, error);
+      // console.error(`Error mengambil data kategori dari API untuk slug ${gameSlug}:`, error);
     }
   }
 
   if (!gameFromApi) {
-    console.warn(`Game dengan slug '${gameSlug}' tidak ditemukan di API atau API tidak dapat dijangkau, atau status tidak aktif.`);
+    // console.warn(`Game dengan slug '${gameSlug}' tidak ditemukan di API atau API tidak dapat dijangkau, atau status tidak aktif.`);
     notFound();
   }
 
   const accountIdFieldsFromApi = Array.isArray(gameFromApi.account_id_field) ? gameFromApi.account_id_field : [];
   if (accountIdFieldsFromApi.length === 0) {
-      console.warn(`Tidak ada account_id_field yang terdefinisi untuk game ${gameSlug} dari API.`);
+      // console.warn(`Tidak ada account_id_field yang terdefinisi untuk game ${gameSlug} dari API.`);
   }
 
   const dynamicPackages = await getPackagesForGame(gameFromApi.id, gameSlug);
@@ -171,3 +171,4 @@ export default async function GamePackagesPage({ params }: Props) {
     <DiamondPackagesClient game={gameForClient} apiUrl={baseApiUrl} />
   );
 }
+

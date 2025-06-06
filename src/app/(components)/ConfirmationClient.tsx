@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { AlertTriangle, CheckCircle2, Gem, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Gem, RefreshCw, ShieldCheck, ArrowLeft, ShoppingCart } from 'lucide-react';
 import Image from 'next/image';
 import { formatPriceIDR } from '@/lib/utils';
 import ProcessingStateCard from './ProcessingStateCard';
@@ -52,7 +52,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         return;
       }
       if (!apiUrl) {
-        console.error("API URL not configured for polling.");
+        // console.error("API URL not configured for polling.");
         if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
         if (!feedbackMessage || feedbackMessage.type !== 'success') {
           setFeedbackMessage({ type: 'error', text: "Konfigurasi API untuk pemeriksaan status bermasalah." });
@@ -62,7 +62,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       }
 
       try {
-        const response = await fetch(\`\${apiUrl}/check-transaction\`, {
+        const response = await fetch(`${apiUrl}/check-transaction`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refId: currentRefId.current }),
@@ -70,22 +70,22 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 
         if (!response.ok) {
           const errorResponseText = await response.text();
-          let detailedErrorMessage = \`Gagal memeriksa status pembayaran (HTTP \${response.status}).\`;
+          let detailedErrorMessage = `Gagal memeriksa status pembayaran (HTTP ${response.status}).`;
           try {
               const errorJson = JSON.parse(errorResponseText);
               const serverMsg = errorJson.message || errorJson.error;
               if (serverMsg) {
-                  detailedErrorMessage += \` Pesan: \${serverMsg}\`;
+                  detailedErrorMessage += ` Pesan: ${serverMsg}`;
               } else if (errorResponseText.trim() !== '{}' && errorResponseText.trim() !== '') {
-                  detailedErrorMessage += \` Respon server: \${errorResponseText.substring(0,150)}\`;
+                  detailedErrorMessage += ` Respon server: ${errorResponseText.substring(0,150)}`;
               }
           } catch (e) {
               if (errorResponseText.trim() !== '') {
-                 detailedErrorMessage += \` Respon server (non-JSON): \${errorResponseText.substring(0,150)}\`;
+                 detailedErrorMessage += ` Respon server (non-JSON): ${errorResponseText.substring(0,150)}`;
               }
           }
           
-          console.warn(\`Error from /check-transaction: \${detailedErrorMessage}. Ref ID: \${currentRefId.current}. Polling continues if DOKU popup might be open.\`);
+          // console.warn(`Error from /check-transaction: ${detailedErrorMessage}. Ref ID: ${currentRefId.current}. Polling continues if DOKU popup might be open.`);
           if (!navigator.onLine) { 
              if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
              currentRefId.current = null;
@@ -100,7 +100,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         const data = await response.json();
 
         if (!data.transaction || typeof data.transaction.status === 'undefined') {
-          console.warn("Format respons /check-transaction tidak valid. 'transaction.status' tidak ditemukan. Respons:", data, "Polling berlanjut.");
+          // console.warn("Format respons /check-transaction tidak valid. 'transaction.status' tidak ditemukan. Respons:", data, "Polling berlanjut.");
           return;
         }
         
@@ -110,7 +110,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         if (transactionStatus === 'SUCCESS') {
           if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
           currentRefId.current = null;
-          setFeedbackMessage({ type: 'success', text: \`Asiiik, pembayaran berhasil! Item akan segera dikirim ke akunmu.\`, transactionId: originalReqId });
+          setFeedbackMessage({ type: 'success', text: `Asiiik, pembayaran berhasil! Item akan segera dikirim ke akunmu.`, transactionId: originalReqId });
           setIsProcessing(false);
         } else if (['EXPIRED', 'FAILED', 'CANCELLED'].includes(transactionStatus)) {
           if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
@@ -119,15 +119,15 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           if (statusText === 'failed') statusText = 'gagal';
           if (statusText === 'expired') statusText = 'kedaluwarsa';
           if (statusText === 'cancelled') statusText = 'dibatalkan';
-          setFeedbackMessage({ type: 'error', text: \`Yah, pembayaran kamu \${statusText}.\`, transactionId: originalReqId });
+          setFeedbackMessage({ type: 'error', text: `Yah, pembayaran kamu ${statusText}.`, transactionId: originalReqId });
           setIsProcessing(false);
         } else if (transactionStatus === 'PENDING') {
-          console.log('Status pembayaran: PENDING. Melanjutkan polling...');
+          // console.log('Status pembayaran: PENDING. Melanjutkan polling...');
         } else {
-          console.warn("Status transaksi tidak diketahui dari API:", transactionStatus, " - Respons Penuh:", data, "Polling berlanjut.");
+          // console.warn("Status transaksi tidak diketahui dari API:", transactionStatus, " - Respons Penuh:", data, "Polling berlanjut.");
         }
       } catch (error: any) {
-        console.error("Error saat polling (blok catch checkStatus):", error);
+        // console.error("Error saat polling (blok catch checkStatus):", error);
         if (!navigator.onLine) {
            if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
            currentRefId.current = null;
@@ -136,7 +136,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
            }
            setIsProcessing(false);
         } else {
-          console.warn(\`Masalah jaringan atau teknis lainnya saat polling. Error: \${error.message || 'Error tidak diketahui'}. Polling berlanjut.\`);
+          // console.warn(`Masalah jaringan atau teknis lainnya saat polling. Error: ${error.message || 'Error tidak diketahui'}. Polling berlanjut.`);
         }
       }
     };
@@ -214,7 +214,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     }
 
     try {
-      const response = await fetch(\`\${apiUrl}/process-order\`, {
+      const response = await fetch(`${apiUrl}/process-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -222,7 +222,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       const result = await response.json();
 
       if (!response.ok) {
-        setFeedbackMessage({ type: 'error', text: result.error || result.message || \`Gagal proses pesanan (Error: \${response.status})\` });
+        setFeedbackMessage({ type: 'error', text: result.error || result.message || `Gagal proses pesanan (Error: ${response.status})` });
         setIsProcessing(false);
         return;
       }
@@ -244,14 +244,14 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         setIsProcessing(false);
       }
     } catch (error) {
-      console.error("Error saat memproses pesanan:", error);
+      // console.error("Error saat memproses pesanan:", error);
       setFeedbackMessage({ type: 'error', text: "Tidak dapat terhubung ke server untuk memproses pesanan. Silakan coba lagi nanti." });
       setIsProcessing(false);
     }
   };
   
   const handleRetryPayment = () => {
-    setIsProcessing(true);
+    setIsProcessing(true); // Ensure processing state is set immediately
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
@@ -264,7 +264,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   const handleGoBack = () => {
     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     currentRefId.current = null;
-    // resetPurchase(); // Consider if full reset is needed or just navigate back
     router.back();
   };
 
@@ -375,7 +374,11 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       )}
 
       {isProcessing && !feedbackMessage && (
-        <ProcessingStateCard />
+        <ProcessingStateCard 
+          titleSize="text-2xl sm:text-3xl md:text-4xl" 
+          loaderSize="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28"
+          descriptionSize="text-base sm:text-lg md:text-xl"
+        />
       )}
 
       {feedbackMessage && selectedGame && selectedPackage && accountDetails && (
@@ -394,3 +397,4 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 };
 
 export default ConfirmationClient;
+
