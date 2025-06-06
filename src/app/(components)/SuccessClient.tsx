@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { CheckCircle, PartyPopper, ShoppingBag } from 'lucide-react';
+import { CheckCircle, PartyPopper, ShoppingCart, Home, ShoppingBag } from 'lucide-react';
 
 const SuccessClient = () => {
   const router = useRouter();
@@ -19,6 +19,17 @@ const SuccessClient = () => {
   const handleGoHome = () => {
     resetPurchase();
     router.push('/');
+  };
+
+  const handleBeliLagi = () => {
+    if (selectedGame) {
+      const gameSlug = selectedGame.slug;
+      resetPurchase();
+      router.push(`/games/${gameSlug}`);
+    } else {
+      // Fallback if selectedGame is somehow null
+      handleGoHome();
+    }
   };
   
   const formatPriceIDR = (price: number | undefined) => {
@@ -93,14 +104,27 @@ const SuccessClient = () => {
             </CardContent>
         </Card>
 
-        <Button onClick={handleGoHome} size="lg" className="bg-primary hover:bg-primary/80 text-primary-foreground text-sm sm:text-base">
-             <ShoppingBag className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-            Kembali ke Beranda
-        </Button>
+        <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row gap-4 w-full max-w-md sm:max-w-none sm:justify-center">
+            <Button
+              onClick={handleBeliLagi}
+              size="lg"
+              variant="outline"
+              className="w-full sm:w-auto text-sm sm:text-base"
+            >
+              <ShoppingCart className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+              Beli Lagi?
+            </Button>
+            <Button
+              onClick={handleGoHome}
+              size="lg"
+              className="w-full sm:w-auto bg-primary hover:bg-primary/80 text-primary-foreground text-sm sm:text-base"
+            >
+              <Home className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+              Ke Menu Utama
+            </Button>
+        </div>
     </div>
   );
 };
 
 export default SuccessClient;
-
-    
