@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { CheckCircle, PartyPopper, ShoppingCart, Home, ShoppingBag } from 'lucide-react';
+import { formatPriceIDR } from '@/lib/utils';
 
 const SuccessClient = () => {
   const router = useRouter();
@@ -24,22 +25,15 @@ const SuccessClient = () => {
   const handleBeliLagi = () => {
     if (selectedGame) {
       const gameSlug = selectedGame.slug;
-      resetPurchase();
-      router.push(`/games/${gameSlug}`);
+      resetPurchase(); // Reset purchase state before navigating
+      router.push(`/games/\${gameSlug}`);
     } else {
-      // Fallback if selectedGame is somehow null
-      handleGoHome();
+      handleGoHome(); // Fallback if selectedGame is somehow null
     }
   };
   
-  const formatPriceIDR = (price: number | undefined) => {
-    if (price === undefined || price === null) return "Rp 0";
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
-  };
 
   if (!selectedGame || !selectedPackage) {
-    // This case might happen if the user directly navigates to /success or context is lost
-    // Provide a generic success message if key details are missing but still on success page
     return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
             <PartyPopper className="h-12 w-12 sm:h-16 sm:w-16 md:h-20 md:w-20 text-green-500 mb-4 sm:mb-6" />
@@ -85,10 +79,12 @@ const SuccessClient = () => {
                 </div>
                 {accountDetails && Object.entries(accountDetails).map(([key, value]) => {
                      let fieldLabel = key;
-                     if (key === 'username') {
+                     if (key.toLowerCase() === 'username') { // Ensure 'username' is handled correctly
                        fieldLabel = "Nickname";
                      } else {
-                       fieldLabel = selectedGame.accountIdFields.find(f => f.name === key)?.label || key;
+                       // Fallback for other keys if not found in accountIdFields, or if accountIdFields is empty
+                       const fieldConfig = selectedGame.accountIdFields.find(f => f.name === key);
+                       fieldLabel = fieldConfig?.label || key.charAt(0).toUpperCase() + key.slice(1);
                      }
                      return (
                         <div className="flex justify-between" key={key}>

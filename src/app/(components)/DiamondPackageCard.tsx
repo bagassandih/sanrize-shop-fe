@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { cn } from '@/lib/utils';
 import { Gem } from 'lucide-react';
 import Image from 'next/image';
+import { formatPriceIDR } from '@/lib/utils';
 
 interface DiamondPackageCardProps {
   pkg: DiamondPackage;
@@ -16,10 +17,6 @@ interface DiamondPackageCardProps {
 }
 
 const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelected }: DiamondPackageCardProps) => {
-  const formatPriceIDR = (price: number) => {
-    if (price === undefined || price === null) return "Rp 0";
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
-  };
 
   return (
     <Card
@@ -35,8 +32,9 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
             <Image 
               src={pkg.imageUrl} 
               alt={pkg.name} 
-              layout="fill" 
-              objectFit="contain" 
+              fill // Changed from layout="fill" objectFit="contain"
+              sizes="(max-width: 640px) 40px, 48px" // Optional: for performance optimization
+              style={{ objectFit: 'contain' }} // Use style for objectFit with fill
               className="rounded-md"
               data-ai-hint="game currency item" 
             />

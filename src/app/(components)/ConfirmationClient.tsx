@@ -6,18 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, ShieldCheck, Gem, ArrowLeft, Info, PartyPopper, ShoppingBag, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Gem, ShieldCheck } from 'lucide-react';
 import Image from 'next/image';
-import { cn } from "@/lib/utils";
+import { formatPriceIDR } from '@/lib/utils';
+import ProcessingStateCard from './ProcessingStateCard';
+import FeedbackStateCard, { type FeedbackMessage } from './FeedbackStateCard';
 
 interface ConfirmationClientProps {
   apiUrl?: string;
-}
-
-interface FeedbackMessage {
-  type: 'success' | 'error' | 'info';
-  text: string;
-  transactionId?: string;
 }
 
 declare global {
@@ -44,11 +40,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     };
   }, []);
 
-  const formatPriceIDR = (price: number | undefined) => {
-    if (price === undefined || price === null) return "Rp 0";
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
-  };
-
   const startPolling = useCallback((refIdToCheck: string) => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
@@ -71,7 +62,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       }
 
       try {
-        const response = await fetch(`${apiUrl}/check-transaction`, {
+        const response = await fetch(\`\${apiUrl}/check-transaction\`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refId: currentRefId.current }),
@@ -79,22 +70,22 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 
         if (!response.ok) {
           const errorResponseText = await response.text();
-          let detailedErrorMessage = `Gagal memeriksa status pembayaran (HTTP ${response.status}).`;
+          let detailedErrorMessage = \`Gagal memeriksa status pembayaran (HTTP \${response.status}).\`;
           try {
               const errorJson = JSON.parse(errorResponseText);
               const serverMsg = errorJson.message || errorJson.error;
               if (serverMsg) {
-                  detailedErrorMessage += ` Pesan: ${serverMsg}`;
+                  detailedErrorMessage += \` Pesan: \${serverMsg}\`;
               } else if (errorResponseText.trim() !== '{}' && errorResponseText.trim() !== '') {
-                  detailedErrorMessage += ` Respon server: ${errorResponseText.substring(0,150)}`;
+                  detailedErrorMessage += \` Respon server: \${errorResponseText.substring(0,150)}\`;
               }
           } catch (e) {
               if (errorResponseText.trim() !== '') {
-                 detailedErrorMessage += ` Respon server (non-JSON): ${errorResponseText.substring(0,150)}`;
+                 detailedErrorMessage += \` Respon server (non-JSON): \${errorResponseText.substring(0,150)}\`;
               }
           }
           
-          console.warn(`Error from /check-transaction: ${detailedErrorMessage}. Ref ID: ${currentRefId.current}. Polling continues if DOKU popup might be open.`);
+          console.warn(\`Error from /check-transaction: \${detailedErrorMessage}. Ref ID: \${currentRefId.current}. Polling continues if DOKU popup might be open.\`);
           if (!navigator.onLine) { 
              if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
              currentRefId.current = null;
@@ -119,7 +110,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         if (transactionStatus === 'SUCCESS') {
           if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
           currentRefId.current = null;
-          setFeedbackMessage({ type: 'success', text: `Asiiik, pembayaran berhasil! Item akan segera dikirim ke akunmu.`, transactionId: originalReqId });
+          setFeedbackMessage({ type: 'success', text: \`Asiiik, pembayaran berhasil! Item akan segera dikirim ke akunmu.\`, transactionId: originalReqId });
           setIsProcessing(false);
         } else if (['EXPIRED', 'FAILED', 'CANCELLED'].includes(transactionStatus)) {
           if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
@@ -128,7 +119,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           if (statusText === 'failed') statusText = 'gagal';
           if (statusText === 'expired') statusText = 'kedaluwarsa';
           if (statusText === 'cancelled') statusText = 'dibatalkan';
-          setFeedbackMessage({ type: 'error', text: `Yah, pembayaran kamu ${statusText}.`, transactionId: originalReqId });
+          setFeedbackMessage({ type: 'error', text: \`Yah, pembayaran kamu \${statusText}.\`, transactionId: originalReqId });
           setIsProcessing(false);
         } else if (transactionStatus === 'PENDING') {
           console.log('Status pembayaran: PENDING. Melanjutkan polling...');
@@ -145,7 +136,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
            }
            setIsProcessing(false);
         } else {
-          console.warn(`Masalah jaringan atau teknis lainnya saat polling. Error: ${error.message || 'Error tidak diketahui'}. Polling berlanjut.`);
+          console.warn(\`Masalah jaringan atau teknis lainnya saat polling. Error: \${error.message || 'Error tidak diketahui'}. Polling berlanjut.\`);
         }
       }
     };
@@ -153,7 +144,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       checkStatus(); 
       pollingIntervalRef.current = setInterval(checkStatus, 5000);
     }, 2000);
-  }, [apiUrl, feedbackMessage]); // feedbackMessage dependency means polling might re-evaluate if feedback changes, generally ok.
+  }, [apiUrl, feedbackMessage]);
 
   const handleConfirmPurchase = async () => {
     if (pollingIntervalRef.current) {
@@ -223,7 +214,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     }
 
     try {
-      const response = await fetch(`${apiUrl}/process-order`, {
+      const response = await fetch(\`\${apiUrl}/process-order\`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -231,7 +222,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       const result = await response.json();
 
       if (!response.ok) {
-        setFeedbackMessage({ type: 'error', text: result.error || result.message || `Gagal proses pesanan (Error: ${response.status})` });
+        setFeedbackMessage({ type: 'error', text: result.error || result.message || \`Gagal proses pesanan (Error: \${response.status})\` });
         setIsProcessing(false);
         return;
       }
@@ -258,6 +249,30 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       setIsProcessing(false);
     }
   };
+  
+  const handleRetryPayment = () => {
+    setIsProcessing(true);
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    currentRefId.current = null;
+    setFeedbackMessage(null);
+    handleConfirmPurchase();
+  };
+
+  const handleGoBack = () => {
+    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+    currentRefId.current = null;
+    // resetPurchase(); // Consider if full reset is needed or just navigate back
+    router.back();
+  };
+
+  const handleProceedToSuccess = () => {
+    resetPurchase();
+    router.push('/success');
+  };
+
 
   if (!selectedGame || !selectedPackage || !accountDetails) {
     return (
@@ -328,7 +343,8 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                     if (key.toLowerCase() === 'username') {
                       fieldLabel = "Nickname";
                     } else {
-                      fieldLabel = selectedGame.accountIdFields.find(f => f.name === key)?.label || key.charAt(0).toUpperCase() + key.slice(1);
+                      const fieldConfig = selectedGame.accountIdFields.find(f => f.name === key);
+                      fieldLabel = fieldConfig?.label || key.charAt(0).toUpperCase() + key.slice(1);
                     }
                     return (
                       <li key={key} className="text-foreground">
@@ -359,152 +375,22 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       )}
 
       {isProcessing && !feedbackMessage && (
-        <div className="flex flex-col items-center justify-center py-10">
-          <Card className="my-6 border-primary bg-primary/10 shadow-lg w-full max-w-md">
-            <CardHeader className="flex flex-col items-center text-center space-y-4 sm:space-y-6 p-6 sm:p-8">
-              <Loader2 className="h-16 w-16 sm:h-20 sm:w-20 text-primary animate-spin" />
-              <CardTitle className="text-2xl sm:text-3xl md:text-4xl text-primary">
-                Sedang Memproses...
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 sm:p-8 pt-0 text-center">
-              <p className="text-base sm:text-lg text-muted-foreground">
-                Sabar ya, status pembayaranmu lagi dicek nih. Mohon jangan refresh atau tutup halaman ini. Popup pembayaran akan muncul atau status akan diperbarui.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <ProcessingStateCard />
       )}
 
-      {feedbackMessage && (
-         <div className="flex flex-col items-center justify-center py-10">
-            <Card className={cn(
-              "my-6 shadow-xl w-full max-w-lg",
-              feedbackMessage.type === 'success' && "border-green-500 bg-green-500/10",
-              feedbackMessage.type === 'error' && "border-destructive bg-destructive/10",
-              feedbackMessage.type === 'info' && "border-sky-500 bg-sky-500/10"
-            )}>
-              <CardHeader className="flex flex-col items-center text-center space-y-3 p-4 sm:p-6">
-                {feedbackMessage.type === 'success' && <PartyPopper className="h-10 w-10 sm:h-12 sm:h-12 text-green-500" />}
-                {feedbackMessage.type === 'error' && <AlertTriangle className="h-10 w-10 sm:h-12 sm:h-12 text-destructive" />}
-                {feedbackMessage.type === 'info' && <Info className="h-10 w-10 sm:h-12 sm:h-12 text-sky-500" />}
-                <CardTitle className={cn(
-                  "text-lg sm:text-xl md:text-2xl",
-                  feedbackMessage.type === 'success' && "text-green-700 dark:text-green-400",
-                  feedbackMessage.type === 'error' && "text-destructive",
-                  feedbackMessage.type === 'info' && "text-sky-700 dark:text-sky-400"
-                )}>
-                  {feedbackMessage.type === 'success' ? "Pembayaran Berhasil!" : feedbackMessage.type === 'error' ? "Waduh, Ada Masalah Nih!" : "Informasi Penting"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6 pt-0 text-center">
-                <p className={cn(
-                  "text-sm sm:text-base mb-4",
-                  feedbackMessage.type === 'success' && "text-green-600 dark:text-green-300",
-                  feedbackMessage.type === 'error' && "text-destructive/90",
-                  feedbackMessage.type === 'info' && "text-sky-600 dark:text-sky-300"
-                )}>
-                  {feedbackMessage.text}
-                </p>
-
-                <div className="text-left bg-muted/30 p-3 sm:p-4 rounded-md my-4 space-y-1.5">
-                  <h4 className="font-semibold text-primary mb-2 text-base sm:text-lg">Detail Transaksi:</h4>
-                  {feedbackMessage.transactionId && (
-                    <div className="flex justify-between text-sm sm:text-base">
-                      <span className="text-muted-foreground">ID Transaksi:</span>
-                      <span className="font-medium text-foreground">{feedbackMessage.transactionId}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-sm sm:text-base">
-                    <span className="text-muted-foreground">Game:</span>
-                    <span className="font-medium text-foreground">{selectedGame.name}</span>
-                  </div>
-                  <div className="flex justify-between items-start text-sm sm:text-base">
-                      <span className="text-muted-foreground pt-0.5">Paket:</span>
-                      <div className="text-right">
-                          <span className="font-medium text-foreground block">{selectedPackage.name}</span>
-                          {selectedPackage.bonus && String(selectedPackage.bonus).trim() !== "" && (
-                              <span className="text-xs text-accent block">Bonus: {String(selectedPackage.bonus)}</span>
-                          )}
-                      </div>
-                  </div>
-                  {accountDetails && Object.entries(accountDetails).map(([key, value]) => {
-                     let fieldLabel = key;
-                     if (key.toLowerCase() === 'username') {
-                       fieldLabel = "Nickname";
-                     } else {
-                       fieldLabel = selectedGame.accountIdFields.find(f => f.name === key)?.label || key.charAt(0).toUpperCase() + key.slice(1);
-                     }
-                     return (
-                        <div className="flex justify-between text-sm sm:text-base" key={key}>
-                            <span className="text-muted-foreground">{fieldLabel}:</span>
-                            <span className="font-medium text-foreground">{String(value)}</span>
-                        </div>
-                     );
-                  })}
-                  <div className="flex justify-between border-t border-border pt-2 mt-2 text-base sm:text-lg">
-                      <span className="text-muted-foreground">Total Bayar:</span>
-                      <span className="font-bold text-accent">{formatPriceIDR(selectedPackage.price)}</span>
-                  </div>
-                </div>
-                
-                {feedbackMessage.type === 'success' && (
-                    <Button 
-                      onClick={() => {
-                        resetPurchase();
-                        router.push('/success');
-                      }} 
-                      className="mt-4 w-full sm:w-auto bg-green-600 hover:bg-green-700" 
-                      size="sm"
-                    >
-                        <ShoppingBag className="mr-2 h-4 w-4" />
-                        Lanjut ke Halaman Sukses
-                    </Button>
-                )}
-                {feedbackMessage.type === 'error' && (
-                  <div className="mt-6 flex flex-col sm:flex-row sm:justify-center sm:space-x-4 space-y-3 sm:space-y-0">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-                        currentRefId.current = null;
-                        resetPurchase(); 
-                        router.push('/'); 
-                      }}
-                      className="w-full sm:w-auto"
-                      size="sm"
-                    >
-                      <ArrowLeft className="mr-2 h-4 w-4" />
-                      Kembali ke Beranda
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setIsProcessing(true); // Immediately set processing state for UI feedback
-                        if (pollingIntervalRef.current) {
-                          clearInterval(pollingIntervalRef.current);
-                          pollingIntervalRef.current = null;
-                        }
-                        currentRefId.current = null;
-                        
-                        setFeedbackMessage(null); 
-                        handleConfirmPurchase();
-                      }}
-                      className="w-full sm:w-auto bg-primary hover:bg-primary/90"
-                      size="sm"
-                    >
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Coba Bayar Lagi
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-        </div>
+      {feedbackMessage && selectedGame && selectedPackage && accountDetails && (
+         <FeedbackStateCard
+            feedbackMessage={feedbackMessage}
+            selectedGame={selectedGame}
+            selectedPackage={selectedPackage}
+            accountDetails={accountDetails}
+            onRetryPayment={handleRetryPayment}
+            onGoBack={handleGoBack}
+            onProceedToSuccess={handleProceedToSuccess}
+          />
       )}
     </div>
   );
 };
 
 export default ConfirmationClient;
-
-    
