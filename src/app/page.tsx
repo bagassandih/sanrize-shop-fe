@@ -27,7 +27,8 @@ async function getGames(): Promise<Game[]> {
 
   try {
     const res = await fetch(`${apiUrl}/category`, { 
-      cache: 'no-store' 
+      cache: 'no-store',
+      mode: 'cors' 
     });
 
     if (!res.ok) {

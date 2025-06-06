@@ -45,7 +45,8 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ idCategory: categoryId }),
-      cache: 'no-store'
+      cache: 'no-store',
+      mode: 'cors'
     });
 
     if (!res.ok) {
