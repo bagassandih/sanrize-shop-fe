@@ -114,10 +114,8 @@ const DiamondPackagesClient = ({ game, apiUrl }: DiamondPackagesClientProps) => 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Origin': window.location.origin,
         },
         body: JSON.stringify(payload),
-        mode: 'cors',
       });
 
       const result = await response.json();
@@ -259,7 +257,3 @@ const DiamondPackagesClient = ({ game, apiUrl }: DiamondPackagesClientProps) => 
 };
 
 export default DiamondPackagesClient;
-
-    
-
-    

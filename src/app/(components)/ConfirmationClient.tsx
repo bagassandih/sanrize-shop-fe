@@ -63,12 +63,10 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       try {
         const response = await fetch(`${apiUrl}/check-transaction`, {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
-            'Origin': window.location.origin,
           },
           body: JSON.stringify({ refId: currentRefId.current }),
-          mode: 'cors',
         });
 
         if (!response.ok) {
@@ -87,8 +85,8 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
                  detailedErrorMessage += ` Respon server (non-JSON): ${errorResponseText.substring(0,150)}`;
               }
           }
-          
-          if (!navigator.onLine) { 
+
+          if (!navigator.onLine) {
              if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
              currentRefId.current = null;
              if (!feedbackMessage || feedbackMessage.type !== 'success') {
@@ -96,7 +94,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
              }
              setIsProcessing(false);
           }
-          return; 
+          return;
         }
 
         const data = await response.json();
@@ -104,7 +102,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         if (!data.transaction || typeof data.transaction.status === 'undefined') {
           return;
         }
-        
+
         const transactionStatus = String(data.transaction.status).toUpperCase();
         const originalReqId = data.transaction.original_request_id || currentRefId.current;
 
@@ -139,17 +137,18 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       }
     };
     setTimeout(() => {
-      checkStatus(); 
+      checkStatus();
       pollingIntervalRef.current = setInterval(checkStatus, 15000);
     }, 2000);
-  }, [apiUrl, feedbackMessage]);
+  }, [apiUrl, feedbackMessage, startPolling]);
+
 
   const handleConfirmPurchase = async () => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
-    currentRefId.current = null; 
+    currentRefId.current = null;
 
     if (!selectedGame || !selectedPackage || !accountDetails || !apiUrl) {
       setFeedbackMessage({ type: 'error', text: "Waduh, info pembeliannya kurang lengkap atau API-nya lagi ngambek nih." });
@@ -157,7 +156,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     }
 
     setIsProcessing(true);
-    setFeedbackMessage(null); 
+    setFeedbackMessage(null);
 
     const primaryAccountIdField = selectedGame.accountIdFields[0]?.name;
     const idGameValue = primaryAccountIdField ? accountDetails[primaryAccountIdField] : undefined;
@@ -183,25 +182,25 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       idService: selectedPackage.originalId,
       nickname: accountDetails.username,
     };
-    
+
     let identifiedZoneValue: string | undefined = undefined;
     const mainIdFieldNameFromGameConfig = selectedGame.accountIdFields[0]?.name;
 
     if (accountDetails) {
       for (const fieldInConfig of selectedGame.accountIdFields) {
         if (mainIdFieldNameFromGameConfig && fieldInConfig.name === mainIdFieldNameFromGameConfig) continue;
-        if (fieldInConfig.name.toLowerCase() === 'username') continue; 
+        if (fieldInConfig.name.toLowerCase() === 'username') continue;
 
         const fieldNameFromConfigLower = fieldInConfig.name.toLowerCase();
         const fieldLabelFromConfigLower = fieldInConfig.label.toLowerCase();
 
-        if (fieldNameFromConfigLower.includes('zone') || fieldNameFromConfigLower.includes('server') || 
+        if (fieldNameFromConfigLower.includes('zone') || fieldNameFromConfigLower.includes('server') ||
             fieldLabelFromConfigLower.includes('zone') || fieldLabelFromConfigLower.includes('server')) {
-          
+
           const valueFromAccountDetails = accountDetails[fieldInConfig.name];
           if (valueFromAccountDetails && String(valueFromAccountDetails).trim() !== "") {
             identifiedZoneValue = String(valueFromAccountDetails);
-            break; 
+            break;
           }
         }
       }
@@ -214,12 +213,10 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     try {
       const response = await fetch(`${apiUrl}/process-order`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Origin': window.location.origin,
         },
         body: JSON.stringify(payload),
-        mode: 'cors',
       });
       const result = await response.json();
 
@@ -236,10 +233,10 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         const { payment_url, ref_id } = result;
         if (typeof window.loadJokulCheckout === 'function') {
           window.loadJokulCheckout(payment_url);
-          startPolling(ref_id); 
+          startPolling(ref_id);
         } else {
           setFeedbackMessage({ type: 'error', text: "Gagal memuat popup pembayaran. Fungsi tidak ditemukan." });
-          setIsProcessing(false); 
+          setIsProcessing(false);
         }
       } else {
         setFeedbackMessage({ type: 'error', text: "Respons tidak valid dari server setelah memproses pesanan." });
@@ -250,16 +247,16 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       setIsProcessing(false);
     }
   };
-  
+
   const handleRetryPayment = () => {
-    setIsProcessing(true);
+    setIsProcessing(true); // Give immediate feedback
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
     currentRefId.current = null;
     setFeedbackMessage(null);
-    handleConfirmPurchase();
+    handleConfirmPurchase(); // This will set isProcessing to true again, but it's fine.
   };
 
   const handleGoBack = () => {
@@ -291,7 +288,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8 p-2">
-      
+
       {!feedbackMessage && !isProcessing && (
         <>
           <div className="text-center">
@@ -364,7 +361,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           </Card>
            <Button
               onClick={handleConfirmPurchase}
-              disabled={isProcessing} 
+              disabled={isProcessing}
               size="lg"
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm sm:text-base mt-6"
             >
@@ -398,7 +395,3 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 };
 
 export default ConfirmationClient;
-
-    
-
-    
