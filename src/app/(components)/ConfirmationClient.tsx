@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { AlertTriangle, CheckCircle2, Gem, RefreshCw, ShieldCheck, ArrowLeft, ShoppingCart } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Gem, RefreshCw, ShieldCheck, ArrowLeft, ShoppingCart, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { formatPriceIDR } from '@/lib/utils';
 import ProcessingStateCard from './ProcessingStateCard';
@@ -52,7 +52,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         return;
       }
       if (!apiUrl) {
-        // console.error("API URL not configured for polling.");
         if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
         if (!feedbackMessage || feedbackMessage.type !== 'success') {
           setFeedbackMessage({ type: 'error', text: "Konfigurasi API untuk pemeriksaan status bermasalah." });
@@ -85,7 +84,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
               }
           }
           
-          // console.warn(`Error from /check-transaction: ${detailedErrorMessage}. Ref ID: ${currentRefId.current}. Polling continues if DOKU popup might be open.`);
           if (!navigator.onLine) { 
              if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
              currentRefId.current = null;
@@ -100,7 +98,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         const data = await response.json();
 
         if (!data.transaction || typeof data.transaction.status === 'undefined') {
-          // console.warn("Format respons /check-transaction tidak valid. 'transaction.status' tidak ditemukan. Respons:", data, "Polling berlanjut.");
           return;
         }
         
@@ -122,12 +119,11 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           setFeedbackMessage({ type: 'error', text: `Yah, pembayaran kamu ${statusText}.`, transactionId: originalReqId });
           setIsProcessing(false);
         } else if (transactionStatus === 'PENDING') {
-          // console.log('Status pembayaran: PENDING. Melanjutkan polling...');
+          // Keep polling
         } else {
-          // console.warn("Status transaksi tidak diketahui dari API:", transactionStatus, " - Respons Penuh:", data, "Polling berlanjut.");
+          // Keep polling for unknown status
         }
       } catch (error: any) {
-        // console.error("Error saat polling (blok catch checkStatus):", error);
         if (!navigator.onLine) {
            if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
            currentRefId.current = null;
@@ -135,14 +131,12 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
              setFeedbackMessage({ type: 'error', text: "Waduh, koneksi internetnya putus. Cek jaringanmu dulu ya."});
            }
            setIsProcessing(false);
-        } else {
-          // console.warn(`Masalah jaringan atau teknis lainnya saat polling. Error: ${error.message || 'Error tidak diketahui'}. Polling berlanjut.`);
         }
       }
     };
     setTimeout(() => {
       checkStatus(); 
-      pollingIntervalRef.current = setInterval(checkStatus, 5000);
+      pollingIntervalRef.current = setInterval(checkStatus, 15000); // Changed from 5000 to 15000
     }, 2000);
   }, [apiUrl, feedbackMessage]);
 
@@ -244,14 +238,13 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         setIsProcessing(false);
       }
     } catch (error) {
-      // console.error("Error saat memproses pesanan:", error);
       setFeedbackMessage({ type: 'error', text: "Tidak dapat terhubung ke server untuk memproses pesanan. Silakan coba lagi nanti." });
       setIsProcessing(false);
     }
   };
   
   const handleRetryPayment = () => {
-    setIsProcessing(true); // Ensure processing state is set immediately
+    setIsProcessing(true);
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
@@ -367,18 +360,18 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
               size="lg"
               className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm sm:text-base mt-6"
             >
-              <CheckCircle2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-              Konfirmasi & Bayar
+              {isProcessing ? (
+                <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+              )}
+              {isProcessing ? "Memproses..." : "Konfirmasi & Bayar"}
             </Button>
         </>
       )}
 
       {isProcessing && !feedbackMessage && (
-        <ProcessingStateCard 
-          titleSize="text-2xl sm:text-3xl md:text-4xl" 
-          loaderSize="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28"
-          descriptionSize="text-base sm:text-lg md:text-xl"
-        />
+         <ProcessingStateCard />
       )}
 
       {feedbackMessage && selectedGame && selectedPackage && accountDetails && (
@@ -397,4 +390,3 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 };
 
 export default ConfirmationClient;
-
