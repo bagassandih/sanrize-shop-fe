@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { AlertTriangle, CheckCircle2, Gem, RefreshCw, ShieldCheck, ArrowLeft, ShoppingCart, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Gem, RefreshCw, ShieldCheck, ArrowLeft, ShoppingCart, Loader2, Home } from 'lucide-react';
 import Image from 'next/image';
 import { formatPriceIDR } from '@/lib/utils';
 import ProcessingStateCard from './ProcessingStateCard';
@@ -265,9 +265,19 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     router.back();
   };
 
-  const handleProceedToSuccess = () => {
+  const handleShopAgain = () => {
+    if (selectedGame) {
+      resetPurchase();
+      router.push(`/games/${selectedGame.slug}`);
+    } else {
+      resetPurchase();
+      router.push('/'); // Fallback to home
+    }
+  };
+
+  const handleGoToHome = () => {
     resetPurchase();
-    router.push('/success');
+    router.push('/');
   };
 
 
@@ -387,7 +397,8 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
             accountDetails={accountDetails}
             onRetryPayment={handleRetryPayment}
             onGoBack={handleGoBack}
-            onProceedToSuccess={handleProceedToSuccess}
+            onShopAgain={handleShopAgain}
+            onGoToHome={handleGoToHome}
           />
       )}
     </div>

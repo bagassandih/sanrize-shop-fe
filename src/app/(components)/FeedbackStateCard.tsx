@@ -3,7 +3,7 @@ import type { Game, DiamondPackage } from '@/lib/data';
 import type { AccountDetails } from '@/app/(store)/PurchaseContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertTriangle, ArrowLeft, Info, PartyPopper, RefreshCw, ShoppingBag } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Info, PartyPopper, RefreshCw, ShoppingCart, Home } from 'lucide-react';
 import TransactionSummary from './TransactionSummary';
 import { cn } from "@/lib/utils";
 
@@ -18,9 +18,10 @@ interface FeedbackStateCardProps {
   selectedGame: Game;
   selectedPackage: DiamondPackage;
   accountDetails: AccountDetails;
-  onRetryPayment: () => void;
-  onGoBack: () => void;
-  onProceedToSuccess: () => void;
+  onRetryPayment: () => void; // For error state
+  onGoBack: () => void; // For error state
+  onShopAgain: () => void; // For success state: "Beli Lagi?"
+  onGoToHome: () => void; // For success state: "Ke Menu Utama"
 }
 
 const FeedbackStateCard = ({
@@ -30,7 +31,8 @@ const FeedbackStateCard = ({
   accountDetails,
   onRetryPayment,
   onGoBack,
-  onProceedToSuccess,
+  onShopAgain,
+  onGoToHome,
 }: FeedbackStateCardProps) => {
   return (
     <div className="flex flex-col items-center justify-center py-10">
@@ -71,14 +73,25 @@ const FeedbackStateCard = ({
           />
 
           {feedbackMessage.type === 'success' && (
-            <Button
-              onClick={onProceedToSuccess}
-              className="mt-4 w-full sm:w-auto bg-green-600 hover:bg-green-700"
-              size="sm"
-            >
-              <ShoppingBag className="mr-2 h-4 w-4" />
-              Lanjut ke Halaman Sukses
-            </Button>
+            <div className="mt-6 flex flex-col sm:flex-row sm:justify-center sm:space-x-4 space-y-3 sm:space-y-0">
+              <Button
+                onClick={onShopAgain}
+                variant="outline"
+                className="w-full sm:w-auto"
+                size="sm"
+              >
+                <ShoppingCart className="mr-2 h-4 w-4" />
+                Beli Lagi?
+              </Button>
+              <Button
+                onClick={onGoToHome}
+                className="w-full sm:w-auto bg-primary hover:bg-primary/90"
+                size="sm"
+              >
+                <Home className="mr-2 h-4 w-4" />
+                Ke Menu Utama
+              </Button>
+            </div>
           )}
           {feedbackMessage.type === 'error' && (
             <div className="mt-6 flex flex-col sm:flex-row sm:justify-center sm:space-x-4 space-y-3 sm:space-y-0">
