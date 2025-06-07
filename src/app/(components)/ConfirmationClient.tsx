@@ -32,6 +32,28 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   const currentRefId = useRef<string | null>(null);
 
   useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (isProcessing) {
+        const message = 'Pembayaran Anda sedang diproses. Apakah Anda yakin ingin meninggalkan halaman ini? Ini dapat mengganggu proses pembayaran.';
+        event.preventDefault(); // Standar untuk sebagian besar browser modern
+        event.returnValue = message; // Diperlukan untuk beberapa browser lama
+        return message; // Untuk browser modern
+      }
+    };
+
+    if (isProcessing) {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+    } else {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    }
+
+    // Cleanup listener saat komponen unmount atau isProcessing berubah
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isProcessing]);
+
+  useEffect(() => {
     return () => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
@@ -406,3 +428,5 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 };
 
 export default ConfirmationClient;
+
+    
