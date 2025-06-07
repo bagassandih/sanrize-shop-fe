@@ -5,7 +5,7 @@ import type { DiamondPackage } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Gem, Star } from 'lucide-react'; // Added Star
+import { Gem, Star } from 'lucide-react';
 import Image from 'next/image';
 import { formatPriceIDR } from '@/lib/utils';
 
@@ -21,14 +21,14 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
   return (
     <Card
       className={cn(
-        "relative overflow-hidden shadow-lg transition-all duration-300 ease-in-out cursor-pointer flex flex-col", // Added relative
+        "relative overflow-hidden shadow-lg transition-all duration-300 ease-in-out cursor-pointer flex flex-col",
         isSelected ? "ring-2 ring-accent scale-105 shadow-accent/50 brightness-105" : "hover:shadow-lg hover:shadow-primary/40 hover:scale-102 hover:brightness-105"
       )}
       onClick={() => onSelectPackage(pkg)}
     >
       {pkg.buy_counter && pkg.buy_counter > 100 && (
-        <div className="absolute top-1.5 right-1.5 z-10 flex items-center rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white shadow-md">
-          <Star className="mr-1 h-3 w-3 fill-white text-white" />
+        <div className="absolute top-1 right-1 z-10 flex items-center rounded-full bg-amber-500 px-2.5 py-1 text-xs font-bold text-white shadow-lg">
+          <Star className="mr-1.5 h-4 w-4 fill-white text-white" />
           Terlaris
         </div>
       )}
@@ -52,7 +52,7 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
              <Gem className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
           </div>
         )}
-        <CardTitle className="text-base sm:text-lg font-semibold text-center text-accent leading-tight pt-1"> {/* Added pt-1 for spacing if badge overlaps */}
+        <CardTitle className="text-base sm:text-lg font-semibold text-center text-accent leading-tight pt-1">
           {pkg.name}
         </CardTitle>
       </CardHeader>
