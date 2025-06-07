@@ -29,15 +29,29 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
     return pkg.name;
   }, [pkg.name]);
 
+  const isBestseller = pkg.buy_counter !== undefined && pkg.buy_counter > 100;
+
   return (
     <Card
       className={cn(
-        "relative overflow-hidden shadow-lg transition-all duration-300 ease-in-out cursor-pointer flex flex-col",
-        isSelected ? "ring-2 ring-accent scale-105 shadow-accent/50 brightness-105" : "hover:shadow-lg hover:shadow-primary/40 hover:scale-102 hover:brightness-105"
+        "relative overflow-hidden transition-all duration-300 ease-in-out cursor-pointer flex flex-col", // Base styles
+        isSelected
+          ? "ring-2 ring-accent scale-105 shadow-accent/50 brightness-105 shadow-lg" // Selected state
+          : [ // Not selected state
+              isBestseller
+                ? "border-2 border-amber-500 shadow-md shadow-amber-500/30" // Bestseller, not selected
+                : "shadow-lg", // Normal, not selected
+              // Common hover for not selected cards
+              "hover:scale-102 hover:brightness-105",
+              // Hover shadow specific to type for not selected cards
+              isBestseller
+                ? "hover:shadow-lg hover:shadow-amber-500/50" // Bestseller hover shadow
+                : "hover:shadow-xl hover:shadow-primary/40" // Normal hover shadow
+            ]
       )}
       onClick={() => onSelectPackage(pkg)}
     >
-      {pkg.buy_counter !== undefined && pkg.buy_counter > 100 && (
+      {isBestseller && (
         <div className="absolute top-1 right-1 z-10 flex items-center rounded-full bg-amber-500 px-2.5 py-1 text-xs font-bold text-white shadow-lg">
           <Star className="mr-1.5 h-4 w-4 fill-white text-white" />
           Terlaris
