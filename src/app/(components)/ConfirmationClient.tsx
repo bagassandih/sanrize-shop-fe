@@ -50,19 +50,14 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [isProcessing]);
-
-  useEffect(() => {
-    // Component unmount cleanup
-    return () => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
       currentRefId.current = null; 
     };
-  }, []);
+  }, [isProcessing]);
+
 
   const startPolling = useCallback((refIdToCheck: string) => {
     if (pollingIntervalRef.current) {
@@ -275,7 +270,6 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
   };
 
   const handleRetryPayment = () => {
-    // Ensure full reset before retrying
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
@@ -306,12 +300,12 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
     setFeedbackMessage(null);
     setIsProcessing(false);
     
-    if (selectedGame) {
-      resetPurchase();
-      router.push(`/games/${selectedGame.slug}`);
-    } else {
-      resetPurchase();
-      router.push('/'); 
+    resetPurchase(); // Clear application state first
+
+    if (selectedGame && typeof window !== 'undefined') {
+      window.location.href = `/games/${selectedGame.slug}`;
+    } else if (typeof window !== 'undefined') {
+      window.location.href = '/'; 
     }
   };
 
@@ -324,8 +318,10 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
     setFeedbackMessage(null);
     setIsProcessing(false);
 
-    resetPurchase();
-    router.push('/');
+    resetPurchase(); // Clear application state first
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
   };
 
 
