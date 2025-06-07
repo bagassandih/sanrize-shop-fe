@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { Game, DiamondPackage, AccountIdField } from '@/lib/data';
@@ -111,7 +110,6 @@ const DiamondPackagesClient = ({ game, apiUrl, xApiToken }: DiamondPackagesClien
     };
 
     try {
-      const xApiToken = process.env.X_API_TOKEN;
       const response = await fetch(checkAccountEndpoint, {
         method: 'POST',
         headers: {
@@ -199,7 +197,7 @@ const DiamondPackagesClient = ({ game, apiUrl, xApiToken }: DiamondPackagesClien
               </DialogTitle>
               <DialogDescription className="text-xs sm:text-base">
                 Untuk game <span className="font-semibold">{game.name}</span> dengan paket <span className="font-semibold">{currentSelectedPackage.name}</span>.
-                 Pastikan data yang Anda masukkan sudah benar.
+                  Pastikan data yang Anda masukkan sudah benar.
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>

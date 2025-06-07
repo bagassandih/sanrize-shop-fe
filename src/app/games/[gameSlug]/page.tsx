@@ -36,7 +36,6 @@ interface ApiCategoryItem {
 async function getPackagesForGame(categoryId: number, gameSlug: string): Promise<DiamondPackage[]> {
   const xApiToken = process.env.X_API_TOKEN;
   const apiUrl = process.env.BASE_API_URL;
-  const xApiToken = process.env.X_API_TOKEN;
 
   if (!apiUrl) {
     return [];
@@ -96,7 +95,6 @@ type Props = {
 export async function generateMetadata({ params: routeParams }: Props): Promise<Metadata> {
   const params = await routeParams;
   const currentApiUrl = process.env.BASE_API_URL;
-  const xApiToken = process.env.X_API_TOKEN;
   const lowerCaseGameSlug = params.gameSlug.toLowerCase();
   let gameName = lowerCaseGameSlug.replace(/-/g, ' ');
   const xApiToken = process.env.X_API_TOKEN;
