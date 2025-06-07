@@ -236,7 +236,6 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
     }
 
     try {
-      console.log(xApiToken)
       const response = await fetch(`${apiUrl}/process-order`, {
         method: 'POST',
         headers: {
