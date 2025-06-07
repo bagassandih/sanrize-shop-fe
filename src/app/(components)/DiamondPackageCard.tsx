@@ -46,14 +46,14 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
       <CardHeader className="pb-2 pt-4 items-center">
         {pkg.imageUrl ? (
           <div className="relative h-10 w-10 sm:h-12 sm:w-12 mb-2">
-            <Image 
-              src={pkg.imageUrl} 
-              alt={displayName} 
+            <Image
+              src={pkg.imageUrl}
+              alt={displayName}
               fill
               sizes="(max-width: 640px) 40px, 48px"
               style={{ objectFit: 'contain' }}
               className="rounded-md"
-              data-ai-hint="game currency item" 
+              data-ai-hint="game currency item"
             />
           </div>
         ) : pkg.iconName === "Gem" ? (
@@ -79,7 +79,7 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
           className="w-full text-xs sm:text-sm"
           aria-pressed={isSelected}
           onClick={(e) => {
-            e.stopPropagation(); 
+            e.stopPropagation();
             onInitiatePurchase(pkg);
           }}
         >
