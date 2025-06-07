@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-const RETRY_DELAY_SECONDS = 7;
+const RETRY_DELAY_SECONDS = 15;
 
 const RateLimitRetryLoader = () => {
   const router = useRouter();
