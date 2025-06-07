@@ -36,6 +36,8 @@ interface ApiCategoryItem {
 async function getPackagesForGame(categoryId: number, gameSlug: string): Promise<DiamondPackage[]> {
   const xApiToken = process.env.X_API_TOKEN;
   const apiUrl = process.env.BASE_API_URL;
+  const xApiToken = process.env.X_API_TOKEN;
+
   if (!apiUrl) {
     return [];
   }
@@ -45,7 +47,7 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Api-Token': xApiToken || ''
+        'X-Api-Token': xApiToken || '',
       },
       body: JSON.stringify({ idCategory: categoryId }),
       cache: 'no-store',
@@ -77,7 +79,7 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
         imageUrl: item.img && item.img.trim() !== "" ? item.img : undefined,
         iconName: (!item.img || item.img.trim() === "") ? 'Gem' : undefined,
         diamonds: undefined,
-        buy_counter: item.buy_counter, // Added buy_counter
+        buy_counter: item.buy_counter,
       }));
   } catch (error) {
     if (error instanceof RateLimitError) {
@@ -94,24 +96,20 @@ type Props = {
 export async function generateMetadata({ params: routeParams }: Props): Promise<Metadata> {
   const params = await routeParams;
   const currentApiUrl = process.env.BASE_API_URL;
+  const xApiToken = process.env.X_API_TOKEN;
   const lowerCaseGameSlug = params.gameSlug.toLowerCase();
   let gameName = lowerCaseGameSlug.replace(/-/g, ' ');
   const xApiToken = process.env.X_API_TOKEN;
 
   if (currentApiUrl) {
     try {
-      const res = await fetch(`${currentApiUrl}/category`, { 
+      const res = await fetch(`${currentApiUrl}/category`, {
         cache: 'no-store',
-        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Api-Token': xApiToken || ''
+          'X-Api-Token': xApiToken || '',
         },
-        body: JSON.stringify({}),
       });
-      // Note: generateMetadata should ideally not throw RateLimitError to avoid breaking metadata generation.
-      // It should gracefully fallback or handle errors internally if possible.
-      // For simplicity, we'll let it proceed, but in a real app, this might need more robust error handling for metadata.
       if (res.ok) {
         const apiResponse = await res.json();
         const categories: ApiCategoryItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
@@ -121,7 +119,7 @@ export async function generateMetadata({ params: routeParams }: Props): Promise<
         }
       }
     } catch (error) {
-      // Silently ignore errors during metadata generation to prevent build failures
+      // Silently ignore errors during metadata generation
     }
   }
 
@@ -140,19 +138,17 @@ export default async function GamePackagesPage({ params }: Props) {
   try {
     const gameSlug = params.gameSlug.toLowerCase();
     const baseApiUrl = process.env.BASE_API_URL;
-    const xApiToken = process.env.X_API_TOKEN;
+    const xApiToken = process.env.X_API_TOKEN; // For passing to client component
 
     let gameFromApi: ApiCategoryItem | undefined;
 
     if (baseApiUrl) {
-      const res = await fetch(`${baseApiUrl}/category`, { 
+      const res = await fetch(`${baseApiUrl}/category`, {
         cache: 'no-store',
-        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Api-Token': xApiToken || ''
+          'X-Api-Token': process.env.X_API_TOKEN || '', // Direct use for this server-side fetch
         },
-        body: JSON.stringify({}),
       });
       if (res.status === 429) {
         throw new RateLimitError('Rate limit exceeded while fetching game details.');
@@ -161,22 +157,17 @@ export default async function GamePackagesPage({ params }: Props) {
         const apiResponse = await res.json();
         const categories: ApiCategoryItem[] = Array.isArray(apiResponse) ? apiResponse : apiResponse.data || [];
         gameFromApi = categories.find(cat => cat.code.toLowerCase() === gameSlug && cat.status === 'active');
-      } else if (res.status !== 404) { // Handle non-404 errors that are not 429
+      } else if (res.status !== 404) {
          throw new Error(`API error fetching category details: ${res.status}`);
       }
-      // If 404 or other issues leading to no gameFromApi, it will be caught by !gameFromApi check
     }
 
     if (!gameFromApi) {
-      notFound(); // Game genuinely not found or initial fetch failed for non-rate-limit reasons
+      notFound();
     }
 
     const accountIdFieldsFromApi = Array.isArray(gameFromApi.account_id_field) ? gameFromApi.account_id_field : [];
-    if (accountIdFieldsFromApi.length === 0) {
-      // This is a warning, not an error that stops rendering usually
-    }
 
-    // This call can also throw RateLimitError
     const dynamicPackages = await getPackagesForGame(gameFromApi.id, gameSlug);
 
     const nameParts = gameFromApi.name.toLowerCase().split(/\s+/);
@@ -195,16 +186,13 @@ export default async function GamePackagesPage({ params }: Props) {
     };
 
     return (
-      <DiamondPackagesClient game={gameForClient} apiUrl={baseApiUrl} />
+      <DiamondPackagesClient game={gameForClient} apiUrl={baseApiUrl} xApiToken={xApiToken} />
     );
 
   } catch (error) {
     if (error instanceof RateLimitError) {
       return <RateLimitRetryLoader />;
     }
-    // For other unexpected errors, allow Next.js to handle or define a global error boundary
-    // If it's an error from `new Error(...)` thrown above, it will also be caught here.
-    // `notFound()` will be handled by Next.js if called.
     throw error;
   }
 }

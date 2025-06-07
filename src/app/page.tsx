@@ -30,12 +30,10 @@ async function getGames(): Promise<Game[]> {
   try {
     const res = await fetch(`${apiUrl}/category`, {
       cache: 'no-store',
-      method: 'POST',
-      headers: new Headers({
+      headers: {
         'Content-Type': 'application/json',
-        'X-Api-Token': xApiToken || ''
-      }),
-      body: JSON.stringify({}) 
+        'X-Api-Token': xApiToken || '',
+      },
     });
 
     if (res.status === 429) {

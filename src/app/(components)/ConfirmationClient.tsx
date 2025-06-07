@@ -14,6 +14,7 @@ import FeedbackStateCard, { type FeedbackMessage } from './FeedbackStateCard';
 
 interface ConfirmationClientProps {
   apiUrl?: string;
+  xApiToken?: string;
 }
 
 declare global {
@@ -22,7 +23,7 @@ declare global {
   }
 }
 
-const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
+const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
   const router = useRouter();
   const { selectedGame, selectedPackage, accountDetails, resetPurchase } = usePurchase();
   const [isProcessing, setIsProcessing] = useState(false);
@@ -89,7 +90,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-             'X-Api-Token': xApiToken || ''
+            'X-Api-Token': xApiToken || '',
           },
           body: JSON.stringify({ refId: currentRefId.current }),
         });
@@ -165,7 +166,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       checkStatus(); // Initial check
       pollingIntervalRef.current = setInterval(checkStatus, 15000); // Subsequent checks
     }, 2000); // Delay initial check slightly
-  }, [apiUrl, feedbackMessage, setFeedbackMessage, setIsProcessing]);
+  }, [apiUrl, xApiToken, feedbackMessage, setFeedbackMessage, setIsProcessing]);
 
 
   const handleConfirmPurchase = async () => {
@@ -241,7 +242,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-           'X-Api-Token': xApiToken || ''
+          'X-Api-Token': xApiToken || '',
         },
         body: JSON.stringify(payload),
       });
@@ -283,8 +284,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     }
     currentRefId.current = null;
     setFeedbackMessage(null); 
-    setIsProcessing(false); // Ensure processing is reset before calling confirm
-    // A very brief timeout can sometimes help ensure state updates propagate before the next action
+    setIsProcessing(false); 
     setTimeout(() => {
         handleConfirmPurchase();
     }, 0);
@@ -456,6 +456,3 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 };
 
 export default ConfirmationClient;
-    
-
-    

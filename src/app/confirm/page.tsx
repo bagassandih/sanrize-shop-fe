@@ -11,7 +11,8 @@ export const metadata: Metadata = {
 
 export default function ConfirmationPage() {
   const apiUrl = process.env.BASE_API_URL;
+  const xApiToken = process.env.X_API_TOKEN;
   return (
-    <ConfirmationClient apiUrl={apiUrl} />
+    <ConfirmationClient apiUrl={apiUrl} xApiToken={xApiToken} />
   );
 }

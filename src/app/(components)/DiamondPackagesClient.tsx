@@ -20,9 +20,10 @@ import Image from 'next/image';
 interface DiamondPackagesClientProps {
   game: Game;
   apiUrl?: string;
+  xApiToken?: string;
 }
 
-const DiamondPackagesClient = ({ game, apiUrl }: DiamondPackagesClientProps) => {
+const DiamondPackagesClient = ({ game, apiUrl, xApiToken }: DiamondPackagesClientProps) => {
   const router = useRouter();
   const { selectedPackage: contextSelectedPackage, setSelectedGame, setSelectedPackage, setAccountDetails } = usePurchase();
   const [currentSelectedPackage, setCurrentSelectedPackage] = useState<DiamondPackage | null>(null);
@@ -115,7 +116,7 @@ const DiamondPackagesClient = ({ game, apiUrl }: DiamondPackagesClientProps) => 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Api-Token': xApiToken || ''
+          'X-Api-Token': xApiToken || '',
         },
         body: JSON.stringify(payload),
       });
