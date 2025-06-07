@@ -21,6 +21,7 @@ interface ApiCategoryItem {
 
 async function getGames(): Promise<Game[]> {
   const apiUrl = process.env.BASE_API_URL;
+  const xApiToken = process.env.X_API_TOKEN;
 
   if (!apiUrl) {
     return [];
@@ -29,10 +30,16 @@ async function getGames(): Promise<Game[]> {
   try {
     const res = await fetch(`${apiUrl}/category`, {
       cache: 'no-store',
+      method: 'POST',
+      headers: new Headers({
+        'Content-Type': 'application/json',
+        'X-Api-Token': xApiToken || ''
+      }),
+      body: JSON.stringify({}) 
     });
 
     if (res.status === 429) {
-      throw new RateLimitError("Rate limit exceeded while fetching game categories.");
+      throw new RateLimitError('Rate limit exceeded while fetching game categories.');
     }
 
     if (!res.ok) {
@@ -87,7 +94,7 @@ export default async function HomePage() {
   }
 
   return (
-    <div className="space-y-12 sm:space-y-16 md:space-y-20">
+    <div className='space-y-12 sm:space-y-16 md:space-y-20'>
       <GameSelectionClient games={games} />
       <HowToOrderSection />
     </div>

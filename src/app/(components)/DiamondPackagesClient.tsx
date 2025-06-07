@@ -110,10 +110,12 @@ const DiamondPackagesClient = ({ game, apiUrl }: DiamondPackagesClientProps) => 
     };
 
     try {
+      const xApiToken = process.env.X_API_TOKEN;
       const response = await fetch(checkAccountEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Api-Token': xApiToken || ''
         },
         body: JSON.stringify(payload),
       });

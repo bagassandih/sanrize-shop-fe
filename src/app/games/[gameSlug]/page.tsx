@@ -34,6 +34,7 @@ interface ApiCategoryItem {
 }
 
 async function getPackagesForGame(categoryId: number, gameSlug: string): Promise<DiamondPackage[]> {
+  const xApiToken = process.env.X_API_TOKEN;
   const apiUrl = process.env.BASE_API_URL;
   if (!apiUrl) {
     return [];
@@ -44,6 +45,7 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'X-Api-Token': xApiToken || ''
       },
       body: JSON.stringify({ idCategory: categoryId }),
       cache: 'no-store',
@@ -94,10 +96,19 @@ export async function generateMetadata({ params: routeParams }: Props): Promise<
   const currentApiUrl = process.env.BASE_API_URL;
   const lowerCaseGameSlug = params.gameSlug.toLowerCase();
   let gameName = lowerCaseGameSlug.replace(/-/g, ' ');
+  const xApiToken = process.env.X_API_TOKEN;
 
   if (currentApiUrl) {
     try {
-      const res = await fetch(`${currentApiUrl}/category`, { cache: 'no-store' });
+      const res = await fetch(`${currentApiUrl}/category`, { 
+        cache: 'no-store',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-Token': xApiToken || ''
+        },
+        body: JSON.stringify({}),
+      });
       // Note: generateMetadata should ideally not throw RateLimitError to avoid breaking metadata generation.
       // It should gracefully fallback or handle errors internally if possible.
       // For simplicity, we'll let it proceed, but in a real app, this might need more robust error handling for metadata.
@@ -129,11 +140,20 @@ export default async function GamePackagesPage({ params }: Props) {
   try {
     const gameSlug = params.gameSlug.toLowerCase();
     const baseApiUrl = process.env.BASE_API_URL;
+    const xApiToken = process.env.X_API_TOKEN;
 
     let gameFromApi: ApiCategoryItem | undefined;
 
     if (baseApiUrl) {
-      const res = await fetch(`${baseApiUrl}/category`, { cache: 'no-store' });
+      const res = await fetch(`${baseApiUrl}/category`, { 
+        cache: 'no-store',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-Token': xApiToken || ''
+        },
+        body: JSON.stringify({}),
+      });
       if (res.status === 429) {
         throw new RateLimitError('Rate limit exceeded while fetching game details.');
       }

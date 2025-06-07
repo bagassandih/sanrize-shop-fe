@@ -84,10 +84,12 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       }
 
       try {
+        const xApiToken = process.env.X_API_TOKEN;
         const response = await fetch(`${apiUrl}/check-transaction`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+             'X-Api-Token': xApiToken || ''
           },
           body: JSON.stringify({ refId: currentRefId.current }),
         });
@@ -234,10 +236,12 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     }
 
     try {
+      const xApiToken = process.env.X_API_TOKEN;
       const response = await fetch(`${apiUrl}/process-order`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+           'X-Api-Token': xApiToken || ''
         },
         body: JSON.stringify(payload),
       });
