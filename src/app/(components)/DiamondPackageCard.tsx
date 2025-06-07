@@ -37,7 +37,7 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
       )}
       onClick={() => onSelectPackage(pkg)}
     >
-      {pkg.buy_counter && pkg.buy_counter > 100 && (
+      {pkg.buy_counter !== undefined && pkg.buy_counter > 100 && (
         <div className="absolute top-1 right-1 z-10 flex items-center rounded-full bg-amber-500 px-2.5 py-1 text-xs font-bold text-white shadow-lg">
           <Star className="mr-1.5 h-4 w-4 fill-white text-white" />
           Terlaris
