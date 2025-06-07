@@ -35,9 +35,9 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (isProcessing) {
         const message = 'Yakin ingin keluar? Proses topup sedang berlangsung lho.';
-        event.preventDefault(); // Standar untuk sebagian besar browser modern
-        event.returnValue = message; // Diperlukan untuk beberapa browser lama
-        return message; // Untuk browser modern
+        event.preventDefault(); 
+        event.returnValue = message; 
+        return message; 
       }
     };
 
@@ -59,7 +59,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
-      currentRefId.current = null; // Ensure currentRefId is also cleared on unmount
+      currentRefId.current = null; 
     };
   }, []);
 
@@ -160,9 +160,9 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       }
     };
     setTimeout(() => {
-      checkStatus();
-      pollingIntervalRef.current = setInterval(checkStatus, 15000);
-    }, 2000);
+      checkStatus(); // Initial check
+      pollingIntervalRef.current = setInterval(checkStatus, 15000); // Subsequent checks
+    }, 2000); // Delay initial check slightly
   }, [apiUrl, feedbackMessage, setFeedbackMessage, setIsProcessing]);
 
 
@@ -272,20 +272,26 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   };
 
   const handleRetryPayment = () => {
-    setIsProcessing(true); 
+    // Ensure full reset before retrying
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
     currentRefId.current = null;
-    setFeedbackMessage(null);
-    handleConfirmPurchase();
+    setFeedbackMessage(null); 
+    setIsProcessing(false); // Ensure processing is reset before calling confirm
+    // A very brief timeout can sometimes help ensure state updates propagate before the next action
+    setTimeout(() => {
+        handleConfirmPurchase();
+    }, 0);
   };
 
   const handleGoBack = () => {
     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     pollingIntervalRef.current = null;
     currentRefId.current = null;
+    setFeedbackMessage(null);
+    setIsProcessing(false);
     router.back();
   };
 
@@ -295,6 +301,8 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       pollingIntervalRef.current = null;
     }
     currentRefId.current = null;
+    setFeedbackMessage(null);
+    setIsProcessing(false);
     
     if (selectedGame) {
       resetPurchase();
@@ -311,6 +319,8 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       pollingIntervalRef.current = null;
     }
     currentRefId.current = null;
+    setFeedbackMessage(null);
+    setIsProcessing(false);
 
     resetPurchase();
     router.push('/');
@@ -442,5 +452,6 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 };
 
 export default ConfirmationClient;
+    
 
     
