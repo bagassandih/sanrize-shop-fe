@@ -75,6 +75,7 @@ async function getPackagesForGame(categoryId: number, gameSlug: string): Promise
         imageUrl: item.img && item.img.trim() !== "" ? item.img : undefined,
         iconName: (!item.img || item.img.trim() === "") ? 'Gem' : undefined,
         diamonds: undefined,
+        buy_counter: item.buy_counter, // Added buy_counter
       }));
   } catch (error) {
     if (error instanceof RateLimitError) {

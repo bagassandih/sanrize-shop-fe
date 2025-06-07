@@ -5,7 +5,7 @@ import type { DiamondPackage } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { Gem } from 'lucide-react';
+import { Gem, Star } from 'lucide-react'; // Added Star
 import Image from 'next/image';
 import { formatPriceIDR } from '@/lib/utils';
 
@@ -21,20 +21,26 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
   return (
     <Card
       className={cn(
-        "overflow-hidden shadow-lg transition-all duration-300 ease-in-out cursor-pointer flex flex-col",
+        "relative overflow-hidden shadow-lg transition-all duration-300 ease-in-out cursor-pointer flex flex-col", // Added relative
         isSelected ? "ring-2 ring-accent scale-105 shadow-accent/50 brightness-105" : "hover:shadow-lg hover:shadow-primary/40 hover:scale-102 hover:brightness-105"
       )}
       onClick={() => onSelectPackage(pkg)}
     >
+      {pkg.buy_counter && pkg.buy_counter > 100 && (
+        <div className="absolute top-1.5 right-1.5 z-10 flex items-center rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white shadow-md">
+          <Star className="mr-1 h-3 w-3 fill-white text-white" />
+          Terlaris
+        </div>
+      )}
       <CardHeader className="pb-2 pt-4 items-center">
         {pkg.imageUrl ? (
           <div className="relative h-10 w-10 sm:h-12 sm:w-12 mb-2">
             <Image 
               src={pkg.imageUrl} 
               alt={pkg.name} 
-              fill // Changed from layout="fill" objectFit="contain"
-              sizes="(max-width: 640px) 40px, 48px" // Optional: for performance optimization
-              style={{ objectFit: 'contain' }} // Use style for objectFit with fill
+              fill
+              sizes="(max-width: 640px) 40px, 48px"
+              style={{ objectFit: 'contain' }}
               className="rounded-md"
               data-ai-hint="game currency item" 
             />
@@ -46,7 +52,7 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
              <Gem className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
           </div>
         )}
-        <CardTitle className="text-base sm:text-lg font-semibold text-center text-accent leading-tight">
+        <CardTitle className="text-base sm:text-lg font-semibold text-center text-accent leading-tight pt-1"> {/* Added pt-1 for spacing if badge overlaps */}
           {pkg.name}
         </CardTitle>
       </CardHeader>

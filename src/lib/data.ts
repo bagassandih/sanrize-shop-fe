@@ -10,6 +10,7 @@ export interface DiamondPackage {
   bonus?: string;
   iconName?: 'Gem';
   imageUrl?: string;
+  buy_counter?: number; // Added to track sales volume
 }
 
 export interface AccountIdField {
