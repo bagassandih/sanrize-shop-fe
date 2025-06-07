@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-const RETRY_DELAY_SECONDS = 30;
+const RETRY_DELAY_SECONDS = 60;
 
 const RateLimitRetryLoader = () => {
   const router = useRouter();
@@ -36,10 +36,10 @@ const RateLimitRetryLoader = () => {
         </CardHeader>
         <CardContent className="space-y-2 sm:space-y-3 text-sm sm:text-base p-4 sm:p-6 pt-0">
           <p className="text-muted-foreground">
-            Lagi banyak banget nih permintaannya, tunggu sebentar ya.
+            Lagi banyak banget nih permintaannya, tunggu sebentar ya..
           </p>
           <p className="text-muted-foreground">
-            Akan dicoba lagi secara otomatis dalam {countdown} detik...
+            Akan dicoba lagi secara otomatis dalam {countdown} detik, Kalo masih belum bisa, coba refresh aja..
           </p>
         </CardContent>
       </Card>
