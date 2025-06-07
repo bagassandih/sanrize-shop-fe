@@ -34,7 +34,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (isProcessing) {
-        const message = 'Pembayaran Anda sedang diproses. Apakah Anda yakin ingin meninggalkan halaman ini? Ini dapat mengganggu proses pembayaran.';
+        const message = 'Yakin ingin keluar? Proses topup sedang berlangsung lho.';
         event.preventDefault(); // Standar untuk sebagian besar browser modern
         event.returnValue = message; // Diperlukan untuk beberapa browser lama
         return message; // Untuk browser modern
@@ -160,7 +160,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     };
     setTimeout(() => {
       checkStatus();
-      pollingIntervalRef.current = setInterval(checkStatus, 10000);
+      pollingIntervalRef.current = setInterval(checkStatus, 15000); // Interval changed to 15 seconds
     }, 2000);
   }, [apiUrl, feedbackMessage, setFeedbackMessage, setIsProcessing]);
 
