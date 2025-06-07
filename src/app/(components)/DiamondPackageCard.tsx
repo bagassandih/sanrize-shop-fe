@@ -3,11 +3,12 @@
 
 import type { DiamondPackage } from '@/lib/data';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Gem, Star } from 'lucide-react';
 import Image from 'next/image';
 import { formatPriceIDR } from '@/lib/utils';
+import { useMemo } from 'react';
 
 interface DiamondPackageCardProps {
   pkg: DiamondPackage;
@@ -17,6 +18,16 @@ interface DiamondPackageCardProps {
 }
 
 const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelected }: DiamondPackageCardProps) => {
+
+  const displayName = useMemo(() => {
+    if (!pkg.name) return '';
+    const parts = pkg.name.split(" ");
+    if (parts.length > 0 && /^\d+$/.test(parts[0])) { // First part is purely numeric
+      parts[0] = String(parseInt(parts[0], 10)); // This removes leading zeros
+      return parts.join(" ");
+    }
+    return pkg.name;
+  }, [pkg.name]);
 
   return (
     <Card
@@ -37,7 +48,7 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
           <div className="relative h-10 w-10 sm:h-12 sm:w-12 mb-2">
             <Image 
               src={pkg.imageUrl} 
-              alt={pkg.name} 
+              alt={displayName} 
               fill
               sizes="(max-width: 640px) 40px, 48px"
               style={{ objectFit: 'contain' }}
@@ -53,7 +64,7 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
           </div>
         )}
         <CardTitle className="text-base sm:text-lg font-semibold text-center text-accent leading-tight pt-1">
-          {pkg.name}
+          {displayName}
         </CardTitle>
       </CardHeader>
       <CardContent className="text-center pb-2 flex-grow pt-1">
