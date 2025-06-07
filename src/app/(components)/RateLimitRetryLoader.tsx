@@ -36,10 +36,13 @@ const RateLimitRetryLoader = () => {
         </CardHeader>
         <CardContent className="space-y-2 sm:space-y-3 text-sm sm:text-base p-4 sm:p-6 pt-0">
           <p className="text-muted-foreground">
-            Lagi banyak banget nih permintaannya, tunggu sebentar ya..
+            Lagi banyak banget nih permintaannya, tunggu sebentar ya!
           </p>
           <p className="text-muted-foreground">
-            Akan dicoba lagi secara otomatis dalam {countdown} detik, Kalo masih belum bisa, coba refresh aja..
+            Akan dicoba lagi secara otomatis dalam {countdown} detik..
+          </p>
+          <p className="text-muted-foreground">
+            Kalo masih belum bisa, coba refresh lagi aja..
           </p>
         </CardContent>
       </Card>
