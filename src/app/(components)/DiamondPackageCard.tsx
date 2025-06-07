@@ -38,15 +38,8 @@ const DiamondPackageCard = ({ pkg, onSelectPackage, onInitiatePurchase, isSelect
         isSelected
           ? "ring-2 ring-accent scale-105 shadow-accent/50 brightness-105 shadow-lg" // Selected state
           : [ // Not selected state
-              isBestseller
-                ? "border-2 border-amber-500 shadow-md shadow-amber-500/30" // Bestseller, not selected
-                : "shadow-lg", // Normal, not selected
-              // Common hover for not selected cards
-              "hover:scale-102 hover:brightness-105",
-              // Hover shadow specific to type for not selected cards
-              isBestseller
-                ? "hover:shadow-lg hover:shadow-amber-500/50" // Bestseller hover shadow
-                : "hover:shadow-xl hover:shadow-primary/40" // Normal hover shadow
+              "shadow-lg", // Normal shadow for non-selected cards
+              "hover:scale-102 hover:brightness-105 hover:shadow-xl hover:shadow-primary/40" // Common hover for non-selected cards
             ]
       )}
       onClick={() => onSelectPackage(pkg)}
