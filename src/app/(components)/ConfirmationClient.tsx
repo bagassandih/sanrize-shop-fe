@@ -138,7 +138,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     };
     setTimeout(() => {
       checkStatus();
-      pollingIntervalRef.current = setInterval(checkStatus, 15000);
+      pollingIntervalRef.current = setInterval(checkStatus, 10000);
     }, 2000);
   }, [apiUrl, feedbackMessage, setFeedbackMessage, setIsProcessing]);
 
