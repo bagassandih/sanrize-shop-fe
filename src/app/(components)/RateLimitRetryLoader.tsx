@@ -31,12 +31,12 @@ const RateLimitRetryLoader = () => {
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="text-lg sm:text-xl md:text-2xl text-primary flex flex-col items-center justify-center">
             <Loader2 className="h-10 w-10 sm:h-12 sm:w-12 text-primary animate-spin mb-4" />
-            Server Sibuk
+            Server sedang Sibuk
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 sm:space-y-3 text-sm sm:text-base p-4 sm:p-6 pt-0">
           <p className="text-muted-foreground">
-            Terlalu banyak permintaan ke server saat ini.
+            Lagi banyak banget nih permintaannya, tunggu sebentar ya.
           </p>
           <p className="text-muted-foreground">
             Akan dicoba lagi secara otomatis dalam {countdown} detik...
