@@ -47,18 +47,19 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     }
 
-    // Cleanup listener saat komponen unmount atau isProcessing berubah
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [isProcessing]);
 
   useEffect(() => {
+    // Component unmount cleanup
     return () => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
+      currentRefId.current = null; // Ensure currentRefId is also cleared on unmount
     };
   }, []);
 
@@ -160,7 +161,7 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
     };
     setTimeout(() => {
       checkStatus();
-      pollingIntervalRef.current = setInterval(checkStatus, 15000); // Interval changed to 15 seconds
+      pollingIntervalRef.current = setInterval(checkStatus, 15000);
     }, 2000);
   }, [apiUrl, feedbackMessage, setFeedbackMessage, setIsProcessing]);
 
@@ -283,21 +284,34 @@ const ConfirmationClient = ({ apiUrl }: ConfirmationClientProps) => {
 
   const handleGoBack = () => {
     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+    pollingIntervalRef.current = null;
     currentRefId.current = null;
     router.back();
   };
 
   const handleShopAgain = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    currentRefId.current = null;
+    
     if (selectedGame) {
       resetPurchase();
       router.push(`/games/${selectedGame.slug}`);
     } else {
       resetPurchase();
-      router.push('/'); // Fallback to home
+      router.push('/'); 
     }
   };
 
   const handleGoToHome = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    currentRefId.current = null;
+
     resetPurchase();
     router.push('/');
   };
