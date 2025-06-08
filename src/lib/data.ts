@@ -78,12 +78,11 @@ export interface Order {
 }
 
 // For stricter type checking on status names
-export type OrderItemStatusName = 
-  | 'SUCCESS' 
-  | 'PENDING' 
-  | 'FAILED' 
-  | 'EXPIRED' 
-  | 'CANCELLED' 
-  | 'PROCESS' // Assuming 'PROCESS' is a form of pending
-  | 'FAILURE' // Assuming 'FAILURE' is a form of failed
+export type OrderItemStatusCode = 
+  | 'PNDD' 
+  | 'PNDR' 
+  | 'SCCD' 
+  | 'SCCR' 
+  | 'FAILD' 
+  | 'FAILR'
   | string; // Fallback for other potential statuses

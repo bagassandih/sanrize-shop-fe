@@ -10,7 +10,7 @@ import { AlertTriangle, CheckCircle2, Gem, RefreshCw, ShieldCheck, ArrowLeft, Sh
 import Image from 'next/image';
 import { formatPriceIDR } from '@/lib/utils';
 import FeedbackStateCard, { type FeedbackMessage } from './FeedbackStateCard';
-import type { Order, OrderItemStatusName } from '@/lib/data';
+import type { Order, OrderItemStatusCode } from '@/lib/data';
 
 interface ConfirmationClientProps {
   apiUrl?: string;
@@ -125,23 +125,23 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
         return;
       }
 
-      const statusName = String(currentOrderInstance.id_status.name).toUpperCase() as OrderItemStatusName;
+      const statusCode = String(currentOrderInstance.id_status.code).toUpperCase() as OrderItemStatusCode;
       const orderOriginalRefId = currentOrderInstance.ref_id || refIdForCheck;
-      console.log(`Order status for ${orderOriginalRefId}: ${statusName}`);
+      console.log(`Order status for ${orderOriginalRefId}: ${statusCode}`);
 
-      if (statusName.includes('SUCCESS')) {
+      if (statusCode.includes('SCCR')) {
         clearPolling();
         setFeedbackMessage({ type: 'success', text: `Asiiik, pembayaran berhasil! Item akan segera dikirim ke akunmu. (${currentOrderInstance.id_status.name})`, transactionId: orderOriginalRefId });
         setIsProcessing(false);
-      } else if (statusName.includes('FAILED') || statusName.includes('EXPIRED') || statusName.includes('CANCELLED') || statusName.includes('FAILURE')) {
+      } else if (statusCode.includes('FAILD') || statusCode.includes('FAILR')) {
         clearPolling();
         let statusText = currentOrderInstance.id_status.name || "bermasalah";
         setFeedbackMessage({ type: 'error', text: `Yah, pembayaran kamu ${statusText}.`, transactionId: orderOriginalRefId });
         setIsProcessing(false);
-      } else if (statusName.includes('PENDING') || statusName.includes('PROCESS')) {
+      } else if (statusCode.includes('PNDD') || statusCode.includes('PNDR')) {
         setFeedbackMessage({ type: 'info', text: `Status: ${currentOrderInstance.id_status.name}. Menunggu konfirmasi...`, transactionId: orderOriginalRefId });
         if (isInitialDelayedCheck && isProcessingRef.current && !pollingIntervalRef.current) {
-          console.log(`Order for ${orderOriginalRefId} is ${statusName} after initial check. Setting up 30s polling interval.`);
+          console.log(`Order for ${orderOriginalRefId} is ${statusCode} after initial check. Setting up 30s polling interval.`);
           pollingIntervalRef.current = setInterval(() => {
             if (currentRefId.current === orderOriginalRefId) { // Ensure still polling for the same refId
                 checkOrderStatusAndSetupInterval(orderOriginalRefId, false);
@@ -154,7 +154,7 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
       } else { 
         setFeedbackMessage({ type: 'info', text: `Status: ${currentOrderInstance.id_status.name}. Menunggu update...`, transactionId: orderOriginalRefId });
          if (isInitialDelayedCheck && isProcessingRef.current && !pollingIntervalRef.current) {
-           console.log(`Order for ${orderOriginalRefId} has status ${statusName} after initial check. Setting up 30s polling interval for updates.`);
+           console.log(`Order for ${orderOriginalRefId} has status ${statusCode} after initial check. Setting up 30s polling interval for updates.`);
            pollingIntervalRef.current = setInterval(() => {
              if (currentRefId.current === orderOriginalRefId) { // Ensure still polling for the same refId
                 checkOrderStatusAndSetupInterval(orderOriginalRefId, false);
