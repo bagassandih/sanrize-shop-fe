@@ -23,6 +23,9 @@ declare global {
   }
 }
 
+const SESSION_ACTIVE_REF_ID_KEY = 'sanrize_active_ref_id';
+const SESSION_PAYMENT_IN_PROGRESS_KEY = 'sanrize_payment_in_progress';
+
 const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
   const router = useRouter();
   const { selectedGame, selectedPackage, accountDetails, resetPurchase } = usePurchase();
@@ -31,6 +34,26 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
 
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentRefId = useRef<string | null>(null);
+
+   useEffect(() => {
+    // Attempt to recover polling state on mount
+    if (typeof window !== 'undefined') {
+        const storedRefId = sessionStorage.getItem(SESSION_ACTIVE_REF_ID_KEY);
+        const storedProcessing = sessionStorage.getItem(SESSION_PAYMENT_IN_PROGRESS_KEY);
+
+        if (storedRefId && storedProcessing === 'true' && selectedGame && selectedPackage && accountDetails) {
+            console.log('Attempting to recover polling state for refId:', storedRefId);
+            currentRefId.current = storedRefId;
+            setIsProcessing(true);
+            // startPolling will be called by the useEffect dependent on isProcessing if not already running
+            // or can be called directly if it's designed to be idempotent
+            // For safety, let's ensure startPolling is called to re-establish the interval.
+             if (!pollingIntervalRef.current) { // Only if not already started by another effect
+                startPolling(storedRefId);
+            }
+        }
+    }
+  }, [selectedGame, selectedPackage, accountDetails]); // Add context dependencies
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -44,8 +67,18 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
 
     if (isProcessing) {
       window.addEventListener('beforeunload', handleBeforeUnload);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(SESSION_PAYMENT_IN_PROGRESS_KEY, 'true');
+        if (currentRefId.current) {
+          sessionStorage.setItem(SESSION_ACTIVE_REF_ID_KEY, currentRefId.current);
+        }
+      }
     } else {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem(SESSION_PAYMENT_IN_PROGRESS_KEY);
+        sessionStorage.removeItem(SESSION_ACTIVE_REF_ID_KEY);
+      }
     }
 
     return () => {
@@ -54,7 +87,8 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
-      currentRefId.current = null; 
+      // Do not clear currentRefId.current here on unmount if we want to persist across reloads
+      // It will be cleared when isProcessing becomes false or explicitly.
     };
   }, [isProcessing]);
 
@@ -63,7 +97,7 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
     }
-    currentRefId.current = refIdToCheck;
+    currentRefId.current = refIdToCheck; // Ensure currentRefId is set for the polling logic
 
     const checkStatus = async () => {
       if (!currentRefId.current) {
@@ -112,7 +146,7 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
              if (!feedbackMessage || feedbackMessage.type !== 'success') {
                setFeedbackMessage({ type: 'error', text: "Waduh, koneksi internetnya putus. Cek jaringanmu dulu ya."});
              }
-             setIsProcessing(false);
+             setIsProcessing(false); // This will clear session storage items via useEffect
           }
           return;
         }
@@ -128,18 +162,20 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
 
         if (transactionStatus === 'SUCCESS') {
           if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
           currentRefId.current = null;
           setFeedbackMessage({ type: 'success', text: `Asiiik, pembayaran berhasil! Item akan segera dikirim ke akunmu.`, transactionId: originalReqId });
-          setIsProcessing(false);
+          setIsProcessing(false); // This will clear session storage items via useEffect
         } else if (['EXPIRED', 'FAILED', 'CANCELLED'].includes(transactionStatus)) {
           if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
           currentRefId.current = null;
           let statusText = transactionStatus.toLowerCase();
           if (statusText === 'failed') statusText = 'gagal';
           if (statusText === 'expired') statusText = 'kedaluwarsa';
           if (statusText === 'cancelled') statusText = 'dibatalkan';
           setFeedbackMessage({ type: 'error', text: `Yah, pembayaran kamu ${statusText}.`, transactionId: originalReqId });
-          setIsProcessing(false);
+          setIsProcessing(false); // This will clear session storage items via useEffect
         } else if (transactionStatus === 'PENDING') {
           // Keep polling
         } else {
@@ -148,18 +184,19 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
       } catch (error: any) {
         if (!navigator.onLine) {
            if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+           pollingIntervalRef.current = null;
            currentRefId.current = null;
            if (!feedbackMessage || feedbackMessage.type !== 'success') {
              setFeedbackMessage({ type: 'error', text: "Waduh, koneksi internetnya putus. Cek jaringanmu dulu ya."});
            }
-           setIsProcessing(false);
+           setIsProcessing(false); // This will clear session storage items via useEffect
         }
       }
     };
     setTimeout(() => {
-      checkStatus(); // Initial check
-      pollingIntervalRef.current = setInterval(checkStatus, 30000); // Subsequent checks
-    }, 15000); // Delay initial check slightly
+      checkStatus(); 
+      pollingIntervalRef.current = setInterval(checkStatus, 30000);
+    }, 15000); 
   }, [apiUrl, xApiToken, feedbackMessage, setFeedbackMessage, setIsProcessing]);
 
 
@@ -168,14 +205,14 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
-    currentRefId.current = null;
+    currentRefId.current = null; // Clear any old ref ID
 
     if (!selectedGame || !selectedPackage || !accountDetails || !apiUrl) {
       setFeedbackMessage({ type: 'error', text: "Waduh, info pembeliannya kurang lengkap atau API-nya lagi ngambek nih." });
       return;
     }
 
-    setIsProcessing(true);
+    setIsProcessing(true); // This will set session storage items via useEffect
     setFeedbackMessage(null);
 
     const primaryAccountIdField = selectedGame.accountIdFields[0]?.name;
@@ -252,6 +289,7 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
         setIsProcessing(false);
       } else if (result.payment_url && result.ref_id) {
         const { payment_url, ref_id } = result;
+        currentRefId.current = ref_id; // Set ref_id for polling, isProcessing effect will save to session
         if (typeof window.loadJokulCheckout === 'function') {
           window.loadJokulCheckout(payment_url);
           startPolling(ref_id);
@@ -276,18 +314,20 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
     }
     currentRefId.current = null;
     setFeedbackMessage(null); 
-    setIsProcessing(false); 
+    setIsProcessing(false); // This will clear session storage for processing keys
     setTimeout(() => {
         handleConfirmPurchase();
     }, 0);
   };
 
   const handleGoBack = () => {
+    // No hard reload here, just go back.
+    // Polling and processing state should be cleared by setIsProcessing(false) if an error occurs.
     if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     pollingIntervalRef.current = null;
     currentRefId.current = null;
     setFeedbackMessage(null);
-    setIsProcessing(false);
+    setIsProcessing(false); // Clear processing state and related session items
     router.back();
   };
 
@@ -298,14 +338,14 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
     }
     currentRefId.current = null;
     setFeedbackMessage(null);
-    setIsProcessing(false);
+    setIsProcessing(false); // Clear processing state and related session items
     
-    resetPurchase(); // Clear application state first
+    resetPurchase(); // Clear application context state (and its session storage)
 
     if (selectedGame && typeof window !== 'undefined') {
-      window.location.href = `/games/${selectedGame.slug}`;
+      window.location.href = `/games/${selectedGame.slug}`; // Hard reload
     } else if (typeof window !== 'undefined') {
-      window.location.href = '/'; 
+      window.location.href = '/'; // Hard reload
     }
   };
 
@@ -316,16 +356,17 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
     }
     currentRefId.current = null;
     setFeedbackMessage(null);
-    setIsProcessing(false);
+    setIsProcessing(false); // Clear processing state and related session items
 
-    resetPurchase(); // Clear application state first
+    resetPurchase(); // Clear application context state (and its session storage)
     if (typeof window !== 'undefined') {
-      window.location.href = '/';
+      window.location.href = '/'; // Hard reload
     }
   };
 
 
   if (!selectedGame || !selectedPackage || !accountDetails) {
+    // This check now relies on PurchaseContext rehydrating from session storage
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
         <AlertTriangle className="h-12 w-12 sm:h-16 sm:w-16 text-destructive mb-4" />

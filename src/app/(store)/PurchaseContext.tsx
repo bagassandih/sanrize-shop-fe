@@ -1,15 +1,9 @@
+
 "use client";
 
-// Ensure this path is correct based on your project structure
-// For example, if 'data.ts' is in 'src/lib/', then the path is '@/lib/data'
 import type { Game, DiamondPackage } from '@/lib/data';
 import type { ReactNode } from 'react';
-import React, { createContext, useState, useContext } from 'react';
-
-// It's good practice to ensure client components that use context are marked with "use client"
-// However, context definition itself doesn't need it, but components consuming it will.
-// For simplicity, and if this file exports hooks/components meant for client-side,
-// "use client" can be added here. Or, ensure consuming components use it.
+import React, { createContext, useState, useContext, useEffect } from 'react';
 
 export interface AccountDetails {
   [key: string]: string;
@@ -27,15 +21,69 @@ interface PurchaseState {
 
 const PurchaseContext = createContext<PurchaseState | undefined>(undefined);
 
+const SESSION_STORAGE_GAME_KEY = 'sanrize_selectedGame';
+const SESSION_STORAGE_PACKAGE_KEY = 'sanrize_selectedPackage';
+const SESSION_STORAGE_ACCOUNT_KEY = 'sanrize_accountDetails';
+
+const getInitialState = <T,>(key: string, defaultValue: T | null): T | null => {
+  if (typeof window !== 'undefined') {
+    const storedValue = sessionStorage.getItem(key);
+    if (storedValue) {
+      try {
+        return JSON.parse(storedValue) as T;
+      } catch (error) {
+        console.error(`Error parsing sessionStorage item ${key}:`, error);
+        sessionStorage.removeItem(key);
+      }
+    }
+  }
+  return defaultValue;
+};
+
 export const PurchaseProvider = ({ children }: { children: ReactNode }) => {
-  const [selectedGame, setSelectedGame] = useState<Game | null>(null);
-  const [selectedPackage, setSelectedPackage] = useState<DiamondPackage | null>(null);
-  const [accountDetails, setAccountDetails] = useState<AccountDetails | null>(null);
+  const [selectedGame, setSelectedGame] = useState<Game | null>(() => getInitialState<Game>(SESSION_STORAGE_GAME_KEY, null));
+  const [selectedPackage, setSelectedPackage] = useState<DiamondPackage | null>(() => getInitialState<DiamondPackage>(SESSION_STORAGE_PACKAGE_KEY, null));
+  const [accountDetails, setAccountDetails] = useState<AccountDetails | null>(() => getInitialState<AccountDetails>(SESSION_STORAGE_ACCOUNT_KEY, null));
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (selectedGame) {
+        sessionStorage.setItem(SESSION_STORAGE_GAME_KEY, JSON.stringify(selectedGame));
+      } else {
+        sessionStorage.removeItem(SESSION_STORAGE_GAME_KEY);
+      }
+    }
+  }, [selectedGame]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (selectedPackage) {
+        sessionStorage.setItem(SESSION_STORAGE_PACKAGE_KEY, JSON.stringify(selectedPackage));
+      } else {
+        sessionStorage.removeItem(SESSION_STORAGE_PACKAGE_KEY);
+      }
+    }
+  }, [selectedPackage]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (accountDetails) {
+        sessionStorage.setItem(SESSION_STORAGE_ACCOUNT_KEY, JSON.stringify(accountDetails));
+      } else {
+        sessionStorage.removeItem(SESSION_STORAGE_ACCOUNT_KEY);
+      }
+    }
+  }, [accountDetails]);
 
   const resetPurchase = () => {
     setSelectedGame(null);
     setSelectedPackage(null);
     setAccountDetails(null);
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem(SESSION_STORAGE_GAME_KEY);
+      sessionStorage.removeItem(SESSION_STORAGE_PACKAGE_KEY);
+      sessionStorage.removeItem(SESSION_STORAGE_ACCOUNT_KEY);
+    }
   };
 
   return (

@@ -22,9 +22,9 @@ const TransactionSummary = ({
     <div className="text-left bg-muted/30 p-3 sm:p-4 rounded-md my-4 space-y-1.5">
       <h4 className="font-semibold text-primary mb-2 text-base sm:text-lg">{headerText}</h4>
       {transactionId && (
-        <div className="flex justify-between text-sm sm:text-base">
-          <span className="text-muted-foreground">ID Transaksi:</span>
-          <span className="font-medium text-foreground">{transactionId}</span>
+        <div className="flex flex-col sm:flex-row justify-between text-sm sm:text-base">
+          <span className="text-muted-foreground mr-1 sm:mr-2 shrink-0">ID Transaksi:</span>
+          <span className="font-medium text-foreground break-all text-left sm:text-right">{transactionId}</span>
         </div>
       )}
       <div className="flex justify-between text-sm sm:text-base">
