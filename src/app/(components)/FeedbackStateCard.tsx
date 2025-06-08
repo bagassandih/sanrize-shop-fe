@@ -3,7 +3,7 @@ import type { Game, DiamondPackage } from '@/lib/data';
 import type { AccountDetails } from '@/app/(store)/PurchaseContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertTriangle, ArrowLeft, Info, PartyPopper, RefreshCw, ShoppingCart, Home } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Info, PartyPopper, RefreshCw, ShoppingCart, Home, Loader2 } from 'lucide-react';
 import TransactionSummary from './TransactionSummary';
 import { cn } from "@/lib/utils";
 
@@ -18,10 +18,10 @@ interface FeedbackStateCardProps {
   selectedGame: Game;
   selectedPackage: DiamondPackage;
   accountDetails: AccountDetails;
-  onRetryPayment: () => void; // For error state
-  onGoBack: () => void; // For error state
-  onShopAgain: () => void; // For success state: "Beli Lagi?"
-  onGoToHome: () => void; // For success state: "Ke Menu Utama"
+  onRetryPayment: () => void;
+  onGoBack: () => void;
+  onShopAgain: () => void;
+  onGoToHome: () => void;
 }
 
 const FeedbackStateCard = ({
@@ -34,6 +34,20 @@ const FeedbackStateCard = ({
   onShopAgain,
   onGoToHome,
 }: FeedbackStateCardProps) => {
+  
+  const getTitle = () => {
+    switch (feedbackMessage.type) {
+      case 'success':
+        return "Pembayaran Berhasil!";
+      case 'error':
+        return "Waduh, Ada Masalah Nih!";
+      case 'info':
+        return "Status Transaksi";
+      default:
+        return "Informasi";
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center py-10">
       <Card className={cn(
@@ -46,13 +60,14 @@ const FeedbackStateCard = ({
           {feedbackMessage.type === 'success' && <PartyPopper className="h-10 w-10 sm:h-12 sm:w-12 text-green-500" />}
           {feedbackMessage.type === 'error' && <AlertTriangle className="h-10 w-10 sm:h-12 sm:w-12 text-destructive" />}
           {feedbackMessage.type === 'info' && <Info className="h-10 w-10 sm:h-12 sm:w-12 text-sky-500" />}
+          
           <CardTitle className={cn(
             "text-lg sm:text-xl md:text-2xl",
             feedbackMessage.type === 'success' && "text-green-700 dark:text-green-400",
             feedbackMessage.type === 'error' && "text-destructive",
             feedbackMessage.type === 'info' && "text-sky-700 dark:text-sky-400"
           )}>
-            {feedbackMessage.type === 'success' ? "Pembayaran Berhasil!" : feedbackMessage.type === 'error' ? "Waduh, Ada Masalah Nih!" : "Informasi Penting"}
+            {getTitle()}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-4 sm:p-6 pt-0 text-center">
@@ -64,6 +79,13 @@ const FeedbackStateCard = ({
           )}>
             {feedbackMessage.text}
           </p>
+          
+          {feedbackMessage.type === 'info' && (
+             <div className="my-4 flex items-center justify-center text-muted-foreground">
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                <span>Memperbarui status...</span>
+            </div>
+          )}
 
           <TransactionSummary
             selectedGame={selectedGame}
@@ -114,6 +136,7 @@ const FeedbackStateCard = ({
               </Button>
             </div>
           )}
+          {/* No buttons for 'info' state by default */}
         </CardContent>
       </Card>
     </div>
