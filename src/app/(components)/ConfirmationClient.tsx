@@ -158,7 +158,7 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
     };
     setTimeout(() => {
       checkStatus(); // Initial check
-      pollingIntervalRef.current = setInterval(checkStatus, 15000); // Subsequent checks
+      pollingIntervalRef.current = setInterval(checkStatus, 30000); // Subsequent checks
     }, 2000); // Delay initial check slightly
   }, [apiUrl, xApiToken, feedbackMessage, setFeedbackMessage, setIsProcessing]);
 
