@@ -124,7 +124,7 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
         }
 
         const transactionStatus = String(data.transaction.status).toUpperCase();
-        const originalReqId = data.transaction.original_request_id || currentRefId.current;
+        const originalReqId = currentRefId.current || data.transaction.original_request_id;
 
         if (transactionStatus === 'SUCCESS') {
           if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
