@@ -57,10 +57,6 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
   const checkOrderStatusAndSetupInterval = useCallback(async (refIdForCheck: string, isInitialDelayedCheck: boolean = false) => {
     if (!currentRefId.current || currentRefId.current !== refIdForCheck) {
         console.log(`Ref ID for polling (${refIdForCheck}) does not match current transaction ref ID (${currentRefId.current}). Aborting check for ${refIdForCheck}.`);
-        // This specific check instance is aborted. If a polling interval was set for refIdForCheck,
-        // it might continue if not cleared by a new polling initiation for currentRefId.current.
-        // clearPolling() here might be too aggressive if another process *just* started polling for currentRefId.current.
-        // The new poller for currentRefId.current is responsible for calling clearPolling().
         return;
     }
 
@@ -94,7 +90,7 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
                 detailedErrorMessage += ` Respon: ${errorResponseText.substring(0,100)}`;
             }
         }
-        if (!navigator.onLine) {
+        if (typeof window !== 'undefined' && !navigator.onLine) {
             setFeedbackMessage(prev => (!prev || prev.type !== 'success') ? { type: 'error', text: "Waduh, koneksi internetnya putus. Cek jaringanmu dulu ya.", transactionId: refIdForCheck} : prev);
         } else {
             setFeedbackMessage(prev => (!prev || (prev.type !== 'success' && prev.type !== 'error')) ? { type: 'error', text: detailedErrorMessage, transactionId: refIdForCheck } : prev);
@@ -114,11 +110,11 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
         if (isInitialDelayedCheck && isProcessingRef.current && !pollingIntervalRef.current) {
             console.log(`Order for ${refIdForCheck} not found or status missing after initial check. Setting up 30s polling interval.`);
             pollingIntervalRef.current = setInterval(() => {
-                if (currentRefId.current === refIdForCheck) { // Ensure still polling for the same refId
+                if (currentRefId.current === refIdForCheck) { 
                     checkOrderStatusAndSetupInterval(refIdForCheck, false);
                 } else {
                     console.log(`Polling for ${refIdForCheck} aborted as currentRefId changed to ${currentRefId.current}`);
-                    clearPolling(); // Clear this specific interval
+                    clearPolling(); 
                 }
             }, 30000);
         }
@@ -143,11 +139,11 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
         if (isInitialDelayedCheck && isProcessingRef.current && !pollingIntervalRef.current) {
           console.log(`Order for ${orderOriginalRefId} is ${statusCode} after initial check. Setting up 30s polling interval.`);
           pollingIntervalRef.current = setInterval(() => {
-            if (currentRefId.current === orderOriginalRefId) { // Ensure still polling for the same refId
+            if (currentRefId.current === orderOriginalRefId) { 
                 checkOrderStatusAndSetupInterval(orderOriginalRefId, false);
             } else {
                 console.log(`Polling for ${orderOriginalRefId} aborted as currentRefId changed to ${currentRefId.current}`);
-                clearPolling(); // Clear this specific interval
+                clearPolling(); 
             }
           }, 30000);
         }
@@ -156,30 +152,57 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
          if (isInitialDelayedCheck && isProcessingRef.current && !pollingIntervalRef.current) {
            console.log(`Order for ${orderOriginalRefId} has status ${statusCode} after initial check. Setting up 30s polling interval for updates.`);
            pollingIntervalRef.current = setInterval(() => {
-             if (currentRefId.current === orderOriginalRefId) { // Ensure still polling for the same refId
+             if (currentRefId.current === orderOriginalRefId) { 
                 checkOrderStatusAndSetupInterval(orderOriginalRefId, false);
              } else {
                 console.log(`Polling for ${orderOriginalRefId} aborted as currentRefId changed to ${currentRefId.current}`);
-                clearPolling(); // Clear this specific interval
+                clearPolling(); 
              }
            }, 30000);
         }
       }
     } catch (error: any) {
-      clearPolling();
-      if (!navigator.onLine) {
-         setFeedbackMessage(prev => (!prev || prev.type !== 'success') ? { type: 'error', text: "Koneksi internet terputus saat memeriksa status.", transactionId: refIdForCheck} : prev);
-      } else {
-        setFeedbackMessage(prev => (!prev || (prev.type !== 'success' && prev.type !== 'error')) ? { type: 'error', text: "Kesalahan saat memeriksa status pembayaran.", transactionId: refIdForCheck } : prev);
+      let tempErrorMessage = "Terjadi masalah saat memeriksa status. Akan dicoba lagi.";
+      // Check window for SSR safety before accessing navigator
+      if (typeof window !== 'undefined' && !navigator.onLine) {
+         tempErrorMessage = "Koneksi internet terputus. Pemeriksaan status akan dilanjutkan.";
       }
-      setIsProcessing(false);
+      
+      setFeedbackMessage(prev => {
+        // Don't overwrite a final success or error message with a temporary polling issue
+        if (prev && (prev.type === 'success' || prev.type === 'error')) {
+          return prev; 
+        }
+        // Otherwise, show the temporary issue, keeping type as 'info' to allow retries
+        return { type: 'info', text: tempErrorMessage, transactionId: refIdForCheck };
+      });
+      
+      // If this was the initial delayed check AND processing is still active AND no interval is set yet,
+      // set up the interval to ensure retries.
+      if (isInitialDelayedCheck && isProcessingRef.current && !pollingIntervalRef.current) {
+        console.warn(`Initial (15s) check for ${refIdForCheck} failed with error. Setting up 30s polling interval for retries. Error: ${error instanceof Error ? error.message : String(error)}`);
+        pollingIntervalRef.current = setInterval(() => {
+            if (currentRefId.current === refIdForCheck) { // Ensure still polling for the same refId
+                checkOrderStatusAndSetupInterval(refIdForCheck, false);
+            } else {
+                // If refId changed, this interval is obsolete. Clear it.
+                // This check is important if clearPolling() in other places didn't catch this specific interval instance.
+                if (pollingIntervalRef.current) { 
+                    console.log(`Retry polling for ${refIdForCheck} aborted as currentRefId changed to ${currentRefId.current}. Clearing this interval.`);
+                    clearInterval(pollingIntervalRef.current);
+                    pollingIntervalRef.current = null; // Mark as cleared
+                }
+            }
+        }, 30000); // 30 seconds
+      }
+      // Do NOT call clearPolling() or setIsProcessing(false) here.
+      // Let the interval try again or let other logic handle final state.
+      return; // Exit this attempt to prevent further processing with a failed fetch
     }
-  }, [apiUrl, xApiToken, setIsProcessing, setFeedbackMessage, clearPolling]);
+  }, [apiUrl, xApiToken, clearPolling]); // Removed setIsProcessing, setFeedbackMessage for stability
 
 
   const startOrderPolling = useCallback((refIdToPoll: string) => {
-    // Check if polling for THIS refId is already effectively active via currentRefId match and existing timers.
-    // This is a guard against redundant starts for the exact same transaction.
     if (currentRefId.current === refIdToPoll && (initialCheckTimeoutRef.current || pollingIntervalRef.current)) {
         console.log(`Polling for ${refIdToPoll} is already initiated or active via timers. Skipping new start.`);
         return;
@@ -211,7 +234,6 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
         const storedProcessing = sessionStorage.getItem(SESSION_PAYMENT_IN_PROGRESS_KEY);
         
         if (storedRefId && storedProcessing === 'true') {
-            // Check if we are already processing this specific refId due to component lifecycle (not full refresh)
             if (currentRefId.current === storedRefId && isProcessingRef.current) {
                 console.log(`Session recovery: Polling for ${storedRefId} seems to be already in progress. No new polling initiated from session.`);
                 return;
@@ -233,20 +255,19 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
                 startOrderPollingRef.current(storedRefId); 
             } else {
                  console.warn("Session recovery for polling aborted: missing game/package/account details from session storage.");
-                 setIsProcessing(false); // Can't process without details
-                 sessionStorage.removeItem(SESSION_PAYMENT_IN_PROGRESS_KEY); // Clear the in-progress flag
+                 setIsProcessing(false); 
+                 sessionStorage.removeItem(SESSION_PAYMENT_IN_PROGRESS_KEY); 
                  sessionStorage.removeItem(SESSION_ACTIVE_REF_ID_KEY);
             }
         }
     }
-    // This effect should run on mount and when context setters change (which are stable)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setSelectedGame, setSelectedPackage, setContextAccountDetails]);
 
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (isProcessingRef.current && currentRefId.current) { // Use ref here
+      if (isProcessingRef.current && currentRefId.current) { 
         const message = 'Yakin ingin keluar? Proses topup sedang berlangsung lho.';
         event.preventDefault();
         event.returnValue = message;
@@ -254,7 +275,7 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
       }
     };
 
-    if (isProcessingRef.current && currentRefId.current) { // Use ref here
+    if (isProcessingRef.current && currentRefId.current) { 
       window.addEventListener('beforeunload', handleBeforeUnload);
       sessionStorage.setItem(SESSION_PAYMENT_IN_PROGRESS_KEY, 'true');
       if (currentRefId.current) {
@@ -268,11 +289,11 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      if (!isProcessingRef.current) { // Use ref here for cleanup condition
+      if (!isProcessingRef.current) { 
         clearPolling();
       }
     };
-  }, [clearPolling]); // isProcessing is not a direct dependency; its effect is through isProcessingRef
+  }, [clearPolling]); 
 
 
   const handleConfirmPurchase = async () => {
@@ -358,7 +379,6 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
         const { payment_url, ref_id } = result;
         currentRefId.current = ref_id; 
         sessionStorage.setItem(SESSION_ACTIVE_REF_ID_KEY, ref_id);
-        // isProcessing is already true, session for payment_in_progress will be set by useEffect
 
         setFeedbackMessage({ type: 'info', text: "Mengarahkan ke halaman pembayaran...", transactionId: ref_id });
 
@@ -396,7 +416,6 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
     currentRefId.current = null;
     setFeedbackMessage(null);
     setIsProcessing(false);
-    // No resetPurchase() here as user might want to adjust account details on previous page
     router.back(); 
   };
 
@@ -473,10 +492,10 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
         selectedGame={selectedGame}
         selectedPackage={selectedPackage}
         accountDetails={accountDetails}
-        onRetryPayment={handleRetryPayment} // Will only be shown if feedback type becomes 'error'
+        onRetryPayment={handleRetryPayment} 
         onGoBack={handleGoBack}
-        onShopAgain={handleShopAgain} // Will only be shown if feedback type becomes 'success'
-        onGoToHome={handleGoToHome}   // Will only be shown if feedback type becomes 'success'
+        onShopAgain={handleShopAgain} 
+        onGoToHome={handleGoToHome}   
       />
     );
   }
