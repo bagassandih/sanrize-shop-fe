@@ -22,6 +22,7 @@ interface FeedbackStateCardProps {
   onGoBack: () => void;
   onShopAgain: () => void;
   onGoToHome: () => void;
+  transactionDate?: string; // Added to pass to TransactionSummary
 }
 
 const FeedbackStateCard = ({
@@ -33,6 +34,7 @@ const FeedbackStateCard = ({
   onGoBack,
   onShopAgain,
   onGoToHome,
+  transactionDate,
 }: FeedbackStateCardProps) => {
   
   const getTitle = () => {
@@ -92,6 +94,7 @@ const FeedbackStateCard = ({
             selectedPackage={selectedPackage}
             accountDetails={accountDetails}
             transactionId={feedbackMessage.transactionId}
+            transactionDate={transactionDate}
           />
 
           {feedbackMessage.type === 'success' && (
@@ -136,7 +139,6 @@ const FeedbackStateCard = ({
               </Button>
             </div>
           )}
-          {/* No buttons for 'info' state by default */}
         </CardContent>
       </Card>
     </div>
@@ -144,3 +146,5 @@ const FeedbackStateCard = ({
 };
 
 export default FeedbackStateCard;
+
+    

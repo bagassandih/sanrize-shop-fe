@@ -40,12 +40,12 @@ export const parseDiamondsFromName = (name: string): number | undefined => {
   return undefined;
 };
 
-// Types for /order endpoint response based on user example
+// Types for /order endpoint response
 export interface OrderItemStatus {
   id: number;
   code: string;
   name: string;
-  created_at: string;
+  created_at: string; // Assuming this is also an ISO date string
   description: string;
 }
 
@@ -55,12 +55,12 @@ export interface OrderItemService {
   name: string;
   note?: string;
   bonus?: string;
-  price: number; // This might be the base price, not markup_price
+  price: number;
   status: string;
-  created_at: string;
+  created_at: string; // Assuming this is also an ISO date string
   buy_counter: number;
   id_category: number;
-  markup_price?: number; // Actual price charged to user
+  markup_price?: number;
   markup_percentage?: number;
 }
 
@@ -71,13 +71,14 @@ export interface Order {
   nickname: string;
   user_id: string;
   note?: string | null;
-  created_at: string;
-  ref_id: string; // Crucial for matching
-  order_id?: string; // External order ID
+  created_at: string; // ISO date string for the order creation time
+  ref_id: string;
+  order_id?: string;
   zone_id?: string;
+  is_checked?: boolean; // from the example response
+  payment_url?: string; // Added for retry payment logic
 }
 
-// For stricter type checking on status names
 export type OrderItemStatusCode = 
   | 'PNDD' 
   | 'PNDR' 
@@ -85,4 +86,6 @@ export type OrderItemStatusCode =
   | 'SCCR' 
   | 'FAILD' 
   | 'FAILR'
-  | string; // Fallback for other potential statuses
+  | string;
+
+    
