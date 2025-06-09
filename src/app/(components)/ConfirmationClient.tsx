@@ -5,12 +5,11 @@ import { usePurchase } from '@/app/(store)/PurchaseContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { AlertTriangle, CheckCircle2, Gem, RefreshCw, ShieldCheck, ArrowLeft, ShoppingCart, Loader2, Home } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { AlertTriangle, CheckCircle2, Gem, ShieldCheck, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { formatPriceIDR } from '@/lib/utils';
-import FeedbackStateCard, { type FeedbackMessage } from './FeedbackStateCard';
-import type { Order, OrderItemStatusCode } from '@/lib/data';
+import FeedbackStateCard, { type FeedbackMessage } from './FeedbackStateCard'; // Keep for potential direct error display
 
 interface ConfirmationClientProps {
   apiUrl?: string;
@@ -23,289 +22,23 @@ declare global {
   }
 }
 
-const SESSION_ACTIVE_REF_ID_KEY = 'sanrize_active_ref_id';
-const SESSION_PAYMENT_IN_PROGRESS_KEY = 'sanrize_payment_in_progress';
-
 const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
   const router = useRouter();
-  const { selectedGame, selectedPackage, accountDetails, resetPurchase, setSelectedGame, setSelectedPackage, setAccountDetails: setContextAccountDetails } = usePurchase();
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [feedbackMessage, setFeedbackMessage] = useState<FeedbackMessage | null>(null);
+  const { selectedGame, selectedPackage, accountDetails, resetPurchase } = usePurchase();
+  const [isProcessing, setIsProcessing] = useState(false); // For the "/process-order" call
+  const [feedbackMessage, setFeedbackMessage] = useState<FeedbackMessage | null>(null); // For errors during "/process-order"
 
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const initialCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const currentRefId = useRef<string | null>(null);
-
-  const isProcessingRef = useRef(isProcessing);
-  useEffect(() => {
-    isProcessingRef.current = isProcessing;
-  }, [isProcessing]);
-
-  const clearPolling = useCallback(() => {
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-      console.log("Polling interval cleared.");
-    }
-    if (initialCheckTimeoutRef.current) {
-      clearTimeout(initialCheckTimeoutRef.current);
-      initialCheckTimeoutRef.current = null;
-      console.log("Initial check timeout cleared.");
-    }
-  }, []);
-
-  const checkOrderStatusAndSetupInterval = useCallback(async (refIdForCheck: string, isInitialDelayedCheck: boolean = false) => {
-    if (!currentRefId.current || currentRefId.current !== refIdForCheck) {
-        console.log(`Ref ID for polling (${refIdForCheck}) does not match current transaction ref ID (${currentRefId.current}). Aborting check for ${refIdForCheck}.`);
-        return;
-    }
-
-    if (!apiUrl) {
-      clearPolling();
-      setFeedbackMessage(prev => (!prev || (prev.type !== 'success' && prev.type !== 'error')) ? { type: 'error', text: "Konfigurasi API bermasalah untuk polling.", transactionId: refIdForCheck } : prev);
-      setIsProcessing(false);
-      return;
-    }
-
-    console.log(`Checking order status for refId: ${refIdForCheck}. InitialDelayedCheck: ${isInitialDelayedCheck}. Current isProcessing: ${isProcessingRef.current}`);
-
-    try {
-      const response = await fetch(`${apiUrl}/order`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-Token': xApiToken || '',
-        },
-        body: JSON.stringify({ refId: refIdForCheck }),
-      });
-
-      if (!response.ok) {
-        const errorResponseText = await response.text();
-        let detailedErrorMessage = `Gagal mengambil status pesanan (HTTP ${response.status}).`;
-        if (errorResponseText) {
-            try {
-                const errorJson = JSON.parse(errorResponseText);
-                detailedErrorMessage += ` Pesan: ${errorJson.message || errorJson.error || 'Tidak ada detail tambahan.'}`;
-            } catch (e) {
-                detailedErrorMessage += ` Respon: ${errorResponseText.substring(0,100)}`;
-            }
-        }
-        if (typeof window !== 'undefined' && !navigator.onLine) {
-            setFeedbackMessage(prev => (!prev || prev.type !== 'success') ? { type: 'error', text: "Waduh, koneksi internetnya putus. Cek jaringanmu dulu ya.", transactionId: refIdForCheck} : prev);
-        } else {
-            setFeedbackMessage(prev => (!prev || (prev.type !== 'success' && prev.type !== 'error')) ? { type: 'error', text: detailedErrorMessage, transactionId: refIdForCheck } : prev);
-        }
-        clearPolling();
-        setIsProcessing(false);
-        return;
-      }
-
-      const orders: Order[] = await response.json();
-      const currentOrderInstance = orders.find(order => order.ref_id === refIdForCheck);
-
-      if (!currentOrderInstance || !currentOrderInstance.id_status || !currentOrderInstance.id_status.name) {
-        if (isInitialDelayedCheck || pollingIntervalRef.current != null) {
-             setFeedbackMessage(prev => (prev === null || prev.type === 'info') ? { type: 'info', text: "Memeriksa status pembayaran...", transactionId: refIdForCheck } : prev);
-        }
-        if (isInitialDelayedCheck && isProcessingRef.current && !pollingIntervalRef.current) {
-            console.log(`Order for ${refIdForCheck} not found or status missing after initial check. Setting up 30s polling interval.`);
-            pollingIntervalRef.current = setInterval(() => {
-                if (currentRefId.current === refIdForCheck) { 
-                    checkOrderStatusAndSetupInterval(refIdForCheck, false);
-                } else {
-                    console.log(`Polling for ${refIdForCheck} aborted as currentRefId changed to ${currentRefId.current}`);
-                    clearPolling(); 
-                }
-            }, 30000);
-        }
-        return;
-      }
-
-      const statusCode = String(currentOrderInstance.id_status.code).toUpperCase() as OrderItemStatusCode;
-      const orderOriginalRefId = currentOrderInstance.ref_id || refIdForCheck;
-      console.log(`Order status for ${orderOriginalRefId}: ${statusCode}`);
-
-      if (statusCode.includes('SCCR')) {
-        clearPolling();
-        setFeedbackMessage({ type: 'success', text: `Asiiik, pembayaran berhasil! Item akan segera dikirim ke akunmu. (${currentOrderInstance.id_status.name})`, transactionId: orderOriginalRefId });
-        setIsProcessing(false);
-      } else if (statusCode.includes('FAILD') || statusCode.includes('FAILR')) {
-        clearPolling();
-        let statusText = currentOrderInstance.id_status.name || "bermasalah";
-        setFeedbackMessage({ type: 'error', text: `Yah, pembayaran kamu ${statusText}.`, transactionId: orderOriginalRefId });
-        setIsProcessing(false);
-      } else if (statusCode.includes('PNDD') || statusCode.includes('PNDR')) {
-        setFeedbackMessage({ type: 'info', text: `Status: ${currentOrderInstance.id_status.name}. Menunggu konfirmasi...`, transactionId: orderOriginalRefId });
-        if (isInitialDelayedCheck && isProcessingRef.current && !pollingIntervalRef.current) {
-          console.log(`Order for ${orderOriginalRefId} is ${statusCode} after initial check. Setting up 30s polling interval.`);
-          pollingIntervalRef.current = setInterval(() => {
-            if (currentRefId.current === orderOriginalRefId) { 
-                checkOrderStatusAndSetupInterval(orderOriginalRefId, false);
-            } else {
-                console.log(`Polling for ${orderOriginalRefId} aborted as currentRefId changed to ${currentRefId.current}`);
-                clearPolling(); 
-            }
-          }, 30000);
-        }
-      } else { 
-        setFeedbackMessage({ type: 'info', text: `Status: ${currentOrderInstance.id_status.name}. Menunggu update...`, transactionId: orderOriginalRefId });
-         if (isInitialDelayedCheck && isProcessingRef.current && !pollingIntervalRef.current) {
-           console.log(`Order for ${orderOriginalRefId} has status ${statusCode} after initial check. Setting up 30s polling interval for updates.`);
-           pollingIntervalRef.current = setInterval(() => {
-             if (currentRefId.current === orderOriginalRefId) { 
-                checkOrderStatusAndSetupInterval(orderOriginalRefId, false);
-             } else {
-                console.log(`Polling for ${orderOriginalRefId} aborted as currentRefId changed to ${currentRefId.current}`);
-                clearPolling(); 
-             }
-           }, 30000);
-        }
-      }
-    } catch (error: any) {
-      let tempErrorMessage = "Terjadi masalah saat memeriksa status. Akan dicoba lagi.";
-      // Check window for SSR safety before accessing navigator
-      if (typeof window !== 'undefined' && !navigator.onLine) {
-         tempErrorMessage = "Koneksi internet terputus. Pemeriksaan status akan dilanjutkan.";
-      }
-      
-      setFeedbackMessage(prev => {
-        // Don't overwrite a final success or error message with a temporary polling issue
-        if (prev && (prev.type === 'success' || prev.type === 'error')) {
-          return prev; 
-        }
-        // Otherwise, show the temporary issue, keeping type as 'info' to allow retries
-        return { type: 'info', text: tempErrorMessage, transactionId: refIdForCheck };
-      });
-      
-      // If this was the initial delayed check AND processing is still active AND no interval is set yet,
-      // set up the interval to ensure retries.
-      if (isInitialDelayedCheck && isProcessingRef.current && !pollingIntervalRef.current) {
-        console.warn(`Initial (15s) check for ${refIdForCheck} failed with error. Setting up 30s polling interval for retries. Error: ${error instanceof Error ? error.message : String(error)}`);
-        pollingIntervalRef.current = setInterval(() => {
-            if (currentRefId.current === refIdForCheck) { // Ensure still polling for the same refId
-                checkOrderStatusAndSetupInterval(refIdForCheck, false);
-            } else {
-                // If refId changed, this interval is obsolete. Clear it.
-                // This check is important if clearPolling() in other places didn't catch this specific interval instance.
-                if (pollingIntervalRef.current) { 
-                    console.log(`Retry polling for ${refIdForCheck} aborted as currentRefId changed to ${currentRefId.current}. Clearing this interval.`);
-                    clearInterval(pollingIntervalRef.current);
-                    pollingIntervalRef.current = null; // Mark as cleared
-                }
-            }
-        }, 30000); // 30 seconds
-      }
-      // Do NOT call clearPolling() or setIsProcessing(false) here.
-      // Let the interval try again or let other logic handle final state.
-      return; // Exit this attempt to prevent further processing with a failed fetch
-    }
-  }, [apiUrl, xApiToken, clearPolling]); // Removed setIsProcessing, setFeedbackMessage for stability
-
-
-  const startOrderPolling = useCallback((refIdToPoll: string) => {
-    if (currentRefId.current === refIdToPoll && (initialCheckTimeoutRef.current || pollingIntervalRef.current)) {
-        console.log(`Polling for ${refIdToPoll} is already initiated or active via timers. Skipping new start.`);
-        return;
-    }
-    
-    clearPolling(); 
-    currentRefId.current = refIdToPoll; 
-    
-    console.log(`Scheduling initial order status check in 15s for refId: ${refIdToPoll}`);
-    initialCheckTimeoutRef.current = setTimeout(() => {
-      if (currentRefId.current === refIdToPoll) {
-        console.log(`Executing initial (15s delayed) order status check for refId: ${refIdToPoll}`);
-        checkOrderStatusAndSetupInterval(refIdToPoll, true);
-      } else {
-         console.log(`RefId changed from ${refIdToPoll} to ${currentRefId.current} before 15s check. Aborting initial check for ${refIdToPoll}.`);
-      }
-    }, 15000);
-  }, [clearPolling, checkOrderStatusAndSetupInterval]);
-
-  const startOrderPollingRef = useRef(startOrderPolling);
-  useEffect(() => {
-    startOrderPollingRef.current = startOrderPolling;
-  }, [startOrderPolling]);
-
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-        const storedRefId = sessionStorage.getItem(SESSION_ACTIVE_REF_ID_KEY);
-        const storedProcessing = sessionStorage.getItem(SESSION_PAYMENT_IN_PROGRESS_KEY);
-        
-        if (storedRefId && storedProcessing === 'true') {
-            if (currentRefId.current === storedRefId && isProcessingRef.current) {
-                console.log(`Session recovery: Polling for ${storedRefId} seems to be already in progress. No new polling initiated from session.`);
-                return;
-            }
-
-            console.log('Session recovery: Attempting to recover order polling state for refId:', storedRefId);
-            const gameFromSession = sessionStorage.getItem('sanrize_selectedGame');
-            const packageFromSession = sessionStorage.getItem('sanrize_selectedPackage');
-            const accountFromSession = sessionStorage.getItem('sanrize_accountDetails');
-
-            if (gameFromSession && packageFromSession && accountFromSession) {
-                if (!selectedGame) setSelectedGame(JSON.parse(gameFromSession));
-                if (!selectedPackage) setSelectedPackage(JSON.parse(packageFromSession));
-                if (!accountDetails) setContextAccountDetails(JSON.parse(accountFromSession));
-
-                currentRefId.current = storedRefId;
-                setIsProcessing(true); 
-                setFeedbackMessage(null); 
-                startOrderPollingRef.current(storedRefId); 
-            } else {
-                 console.warn("Session recovery for polling aborted: missing game/package/account details from session storage.");
-                 setIsProcessing(false); 
-                 sessionStorage.removeItem(SESSION_PAYMENT_IN_PROGRESS_KEY); 
-                 sessionStorage.removeItem(SESSION_ACTIVE_REF_ID_KEY);
-            }
-        }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setSelectedGame, setSelectedPackage, setContextAccountDetails]);
-
-
-  useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (isProcessingRef.current && currentRefId.current) { 
-        const message = 'Yakin ingin keluar? Proses topup sedang berlangsung lho.';
-        event.preventDefault();
-        event.returnValue = message;
-        return message;
-      }
-    };
-
-    if (isProcessingRef.current && currentRefId.current) { 
-      window.addEventListener('beforeunload', handleBeforeUnload);
-      sessionStorage.setItem(SESSION_PAYMENT_IN_PROGRESS_KEY, 'true');
-      if (currentRefId.current) {
-        sessionStorage.setItem(SESSION_ACTIVE_REF_ID_KEY, currentRefId.current);
-      }
-    } else {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      sessionStorage.removeItem(SESSION_PAYMENT_IN_PROGRESS_KEY);
-      sessionStorage.removeItem(SESSION_ACTIVE_REF_ID_KEY);
-    }
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      if (!isProcessingRef.current) { 
-        clearPolling();
-      }
-    };
-  }, [clearPolling]); 
-
+  // No more polling logic here. It moves to OrderDetailClient.
 
   const handleConfirmPurchase = async () => {
-    clearPolling(); 
-    currentRefId.current = null; 
+    // Clear any local feedback from previous attempts on this page
+    setFeedbackMessage(null); 
 
     if (!selectedGame || !selectedPackage || !accountDetails || !apiUrl) {
       setFeedbackMessage({ type: 'error', text: "Waduh, info pembeliannya kurang lengkap atau API-nya lagi ngambek nih." });
       return;
     }
 
-    setFeedbackMessage(null);
     setIsProcessing(true); 
 
     const primaryAccountIdField = selectedGame.accountIdFields[0]?.name;
@@ -377,16 +110,19 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
         setIsProcessing(false);
       } else if (result.payment_url && result.ref_id) {
         const { payment_url, ref_id } = result;
-        currentRefId.current = ref_id; 
-        sessionStorage.setItem(SESSION_ACTIVE_REF_ID_KEY, ref_id);
-
-        setFeedbackMessage({ type: 'info', text: "Mengarahkan ke halaman pembayaran...", transactionId: ref_id });
+        
+        // PurchaseContext already saves to sessionStorage on state change.
+        // No need to manually save ref_id here for polling on *this* page.
 
         if (typeof window.loadJokulCheckout === 'function') {
           window.loadJokulCheckout(payment_url);
-          startOrderPollingRef.current(ref_id); 
+          // Redirect to the new order detail page for polling
+          router.push(`/order/${ref_id}`); 
+          // setIsProcessing will remain true, page navigates away.
+          // If navigation fails, user is stuck on /confirm with isProcessing true.
+          // This is an edge case. A timeout could reset isProcessing if navigation hangs.
         } else {
-          setFeedbackMessage({ type: 'error', text: "Gagal memuat popup pembayaran. Fungsi tidak ditemukan.", transactionId: ref_id });
+          setFeedbackMessage({ type: 'error', text: "Gagal memuat popup pembayaran. Fungsi tidak ditemukan."});
           setIsProcessing(false);
         }
       } else {
@@ -398,63 +134,34 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
       setIsProcessing(false);
     }
   };
+  
+  useEffect(() => {
+    // This effect can be simplified or removed as polling is no longer handled here.
+    // It was primarily for `beforeunload` and session recovery for polling.
+    // If `isProcessing` is true, it means the `/process-order` call is in flight.
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (isProcessing) { 
+        const message = 'Yakin ingin keluar? Proses permintaan pembayaran sedang berlangsung.';
+        event.preventDefault();
+        event.returnValue = message;
+        return message;
+      }
+    };
 
-  const handleRetryPayment = () => {
-    clearPolling();
-    currentRefId.current = null; 
-    setFeedbackMessage(null);
-    setIsProcessing(false); 
-    sessionStorage.removeItem(SESSION_PAYMENT_IN_PROGRESS_KEY);
-    sessionStorage.removeItem(SESSION_ACTIVE_REF_ID_KEY);
-    setTimeout(() => {
-        handleConfirmPurchase();
-    }, 100); 
-  };
-
-  const handleGoBack = () => {
-    clearPolling();
-    currentRefId.current = null;
-    setFeedbackMessage(null);
-    setIsProcessing(false);
-    router.back(); 
-  };
-
-  const handleShopAgain = () => {
-    clearPolling();
-    currentRefId.current = null;
-    setFeedbackMessage(null);
-    setIsProcessing(false);
-    const gameSlug = selectedGame?.slug;
-    resetPurchase(); 
-    if (gameSlug && typeof window !== 'undefined') {
-      window.location.href = `/games/${gameSlug}`;
-    } else if (typeof window !== 'undefined') {
-      window.location.href = '/';
+    if (isProcessing) {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+    } else {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     }
-  };
 
-  const handleGoToHome = () => {
-    clearPolling();
-    currentRefId.current = null;
-    setFeedbackMessage(null);
-    setIsProcessing(false);
-    resetPurchase(); 
-    if (typeof window !== 'undefined') {
-      window.location.href = '/';
-    }
-  };
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isProcessing]);
 
 
   if (!selectedGame || !selectedPackage || !accountDetails) {
-    const wasInProgress = typeof window !== 'undefined' && sessionStorage.getItem(SESSION_PAYMENT_IN_PROGRESS_KEY) === 'true';
-    if (wasInProgress && (!selectedGame || !selectedPackage || !accountDetails)) {
-        return (
-             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
-                <Loader2 className="h-12 w-12 sm:h-16 sm:w-16 text-primary animate-spin mb-4" />
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-foreground mb-2">Memulihkan sesi...</h1>
-            </div>
-        );
-    }
+    // This check is still important if user lands on /confirm directly without context
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
         <AlertTriangle className="h-12 w-12 sm:h-16 sm:w-16 text-destructive mb-4" />
@@ -462,43 +169,31 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
         <p className="text-muted-foreground mb-6 text-xs sm:text-sm md:text-base">
           Detail pembelianmu nggak ketemu nih. Coba mulai dari awal lagi ya.
         </p>
-        <Button onClick={() => { resetPurchase(); if (typeof window !== 'undefined') window.location.href = '/'; }} variant="outline" size="sm" className="text-xs sm:text-sm">
+        <Button onClick={() => { resetPurchase(); router.push('/'); }} variant="outline" size="sm" className="text-xs sm:text-sm">
           Balik ke Beranda
         </Button>
       </div>
     );
   }
 
-  if (feedbackMessage && (feedbackMessage.type === 'success' || feedbackMessage.type === 'error')) {
-    return (
-      <FeedbackStateCard
-        feedbackMessage={feedbackMessage}
-        selectedGame={selectedGame}
-        selectedPackage={selectedPackage}
-        accountDetails={accountDetails}
-        onRetryPayment={handleRetryPayment}
-        onGoBack={handleGoBack}
-        onShopAgain={handleShopAgain}
-        onGoToHome={handleGoToHome}
-      />
+  // If there's a feedback message from /process-order attempt
+  if (feedbackMessage && feedbackMessage.type === 'error') {
+     return (
+      <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8 p-2 text-center">
+        <AlertTriangle className="h-12 w-12 sm:h-16 sm:w-16 text-destructive mx-auto mb-4" />
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-destructive mb-2">Oops, Terjadi Kesalahan</h1>
+        <p className="text-muted-foreground mb-4">{feedbackMessage.text}</p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button onClick={() => router.back()} variant="outline">Kembali</Button>
+            <Button onClick={handleConfirmPurchase} disabled={isProcessing}>
+                {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Coba Lagi
+            </Button>
+        </div>
+      </div>
     );
   }
 
-  if ((isProcessing && currentRefId.current) || (feedbackMessage && feedbackMessage.type === 'info')) {
-    const displayMessage = feedbackMessage || { type: 'info', text: "Memulai proses pembayaran...", transactionId: currentRefId.current! };
-    return (
-      <FeedbackStateCard
-        feedbackMessage={displayMessage}
-        selectedGame={selectedGame}
-        selectedPackage={selectedPackage}
-        accountDetails={accountDetails}
-        onRetryPayment={handleRetryPayment} 
-        onGoBack={handleGoBack}
-        onShopAgain={handleShopAgain} 
-        onGoToHome={handleGoToHome}   
-      />
-    );
-  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8 p-2">
@@ -572,20 +267,19 @@ const ConfirmationClient = ({ apiUrl, xApiToken }: ConfirmationClientProps) => {
       </Card>
       <Button
           onClick={handleConfirmPurchase}
-          disabled={isProcessing && (!feedbackMessage || feedbackMessage.type !== 'error')}
+          disabled={isProcessing}
           size="lg"
           className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-sm sm:text-base mt-6"
         >
-          {(isProcessing && (!feedbackMessage || feedbackMessage.type !== 'error')) ? (
+          {isProcessing ? (
             <Loader2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
           ) : (
             <CheckCircle2 className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
           )}
-          {(isProcessing && (!feedbackMessage || feedbackMessage.type !== 'error')) ? "Memproses..." : "Konfirmasi & Bayar"}
+          {isProcessing ? "Memproses..." : "Konfirmasi & Bayar"}
         </Button>
     </div>
   );
 };
 
 export default ConfirmationClient;
-    
