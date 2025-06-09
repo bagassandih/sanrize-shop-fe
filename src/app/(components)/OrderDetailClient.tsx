@@ -19,11 +19,11 @@ const OrderDetailClient = ({ refId, apiUrl, xApiToken }: OrderDetailClientProps)
   const { selectedGame: contextGame, selectedPackage: contextPackage, accountDetails: contextAccountDetails, resetPurchase } = usePurchase();
   
   const [orderData, setOrderData] = useState<Order | null>(null);
-  const [isProcessing, setIsProcessing] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(true); // True initially until first fetch completes or polling ends
   const [feedbackMessage, setFeedbackMessage] = useState<FeedbackMessage | null>(null);
 
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isProcessingRef = useRef(isProcessing);
+  const isProcessingRef = useRef(isProcessing); // To access current isProcessing state in callbacks
   
   useEffect(() => {
     isProcessingRef.current = isProcessing;
@@ -37,15 +37,21 @@ const OrderDetailClient = ({ refId, apiUrl, xApiToken }: OrderDetailClientProps)
   }, []);
 
   const checkOrderStatusAndSetupInterval = useCallback(async (isInitialDirectFetch: boolean = false) => {
-    if (!apiUrl) {
+    if (!apiUrl || !refId) {
       clearPolling();
-      setFeedbackMessage(prev => (!prev || (prev.type !== 'success' && prev.type !== 'error')) ? { type: 'error', text: "Konfigurasi API bermasalah untuk polling.", transactionId: refId } : prev);
+      setFeedbackMessage(prev => (!prev || (prev.type !== 'success' && prev.type !== 'error')) ? { type: 'error', text: "Konfigurasi API atau ID Referensi bermasalah.", transactionId: refId } : prev);
       setIsProcessing(false);
       return;
     }
+    
+    // If no longer processing (e.g., user navigated away, or final status received), don't fetch.
+    if (!isProcessingRef.current && !isInitialDirectFetch) { // Allow initial fetch even if ref.current is somehow false
+        clearPolling();
+        return;
+    }
 
     try {
-      const response = await fetch(`${apiUrl}/order/${refId}`, {
+      const response = await fetch(`${apiUrl}/order/${refId}`, { // Assumes GET request to /order/:refId
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -57,7 +63,7 @@ const OrderDetailClient = ({ refId, apiUrl, xApiToken }: OrderDetailClientProps)
         const errorResponseText = await response.text();
         let detailedErrorMessage = `Gagal mengambil status pesanan (HTTP ${response.status}).`;
          if (response.status === 404) {
-          detailedErrorMessage = `Transaksi dengan ID ${refId} tidak ditemukan. Mungkin perlu waktu beberapa saat hingga transaksi muncul setelah pembayaran.`;
+          detailedErrorMessage = `Transaksi dengan ID ${refId} tidak ditemukan.`;
         } else if (errorResponseText) {
             try {
                 const errorJson = JSON.parse(errorResponseText);
@@ -70,18 +76,12 @@ const OrderDetailClient = ({ refId, apiUrl, xApiToken }: OrderDetailClientProps)
         if (typeof window !== 'undefined' && !navigator.onLine) {
             setFeedbackMessage(prev => (!prev || prev.type !== 'success') ? { type: 'error', text: "Waduh, koneksi internetnya putus. Cek jaringanmu dulu ya.", transactionId: refId} : prev);
         } else {
-          // For initial fetch error, especially 404, treat it as a potentially recoverable info state if order is very new.
-          if (isInitialDirectFetch && response.status === 404) {
-             setFeedbackMessage({ type: 'info', text: detailedErrorMessage + " Akan dicoba lagi...", transactionId: refId });
-             if (!pollingIntervalRef.current && isProcessingRef.current) { // isProcessingRef to ensure we don't set interval if already finalized by other means
-                pollingIntervalRef.current = setInterval(() => checkOrderStatusAndSetupInterval(false), 30000);
-             }
-             return; // Don't clear polling or set processing false yet
-          } else {
-            setFeedbackMessage(prev => (!prev || (prev.type !== 'success' && prev.type !== 'error')) ? { type: 'error', text: detailedErrorMessage, transactionId: refId } : prev);
-          }
+          setFeedbackMessage(prev => (!prev || (prev.type !== 'success' && prev.type !== 'error')) ? { type: 'error', text: detailedErrorMessage, transactionId: refId } : prev);
         }
-        clearPolling(); // Clear polling on definitive non-404 errors during initial or subsequent fetches
+        // For most errors, we stop polling and mark as not processing.
+        // However, for initial 404, we might want to retry for a bit if the order is very new.
+        // But current logic makes this an error state, which is fine.
+        clearPolling(); 
         setIsProcessing(false);
         return;
       }
@@ -89,7 +89,7 @@ const OrderDetailClient = ({ refId, apiUrl, xApiToken }: OrderDetailClientProps)
       const currentOrderInstance: Order = await response.json();
       setOrderData(currentOrderInstance);
 
-      if (!currentOrderInstance || !currentOrderInstance.id_status || !currentOrderInstance.id_status.name) {
+      if (!currentOrderInstance || !currentOrderInstance.id_status || !currentOrderInstance.id_status.code) {
         setFeedbackMessage(prev => (prev === null || prev.type === 'info') ? { type: 'error', text: "Data pesanan tidak valid dari server.", transactionId: refId } : prev);
         clearPolling();
         setIsProcessing(false);
@@ -97,94 +97,118 @@ const OrderDetailClient = ({ refId, apiUrl, xApiToken }: OrderDetailClientProps)
       }
 
       const statusCode = String(currentOrderInstance.id_status.code).toUpperCase() as OrderItemStatusCode;
+      const statusName = currentOrderInstance.id_status.name || "Tidak diketahui";
       const orderOriginalRefId = currentOrderInstance.ref_id || refId;
 
-      if (statusCode.includes('SCCR') || statusCode.includes('SCCD')) {
+      if (statusCode.includes('SCCD') || statusCode.includes('SCCR')) { // Success codes
         clearPolling();
-        setFeedbackMessage({ type: 'success', text: `Asiiik, pembayaran berhasil! Item akan segera dikirim ke akunmu. (${currentOrderInstance.id_status.name})`, transactionId: orderOriginalRefId });
+        setFeedbackMessage({ type: 'success', text: `Asiiik, pembayaran berhasil! Status: ${statusName}. Item akan segera dikirim.`, transactionId: orderOriginalRefId });
         setIsProcessing(false);
-      } else if (statusCode.includes('FAILD') || statusCode.includes('FAILR')) {
+      } else if (statusCode.includes('FAILD') || statusCode.includes('FAILR')) { // Failure codes
         clearPolling();
-        let statusText = currentOrderInstance.id_status.name || "bermasalah";
-        setFeedbackMessage({ type: 'error', text: `Yah, pembayaran kamu ${statusText}.`, transactionId: orderOriginalRefId });
+        setFeedbackMessage({ type: 'error', text: `Yah, pembayaran kamu ${statusName}.`, transactionId: orderOriginalRefId });
         setIsProcessing(false);
-      } else if (statusCode.includes('PNDD') || statusCode.includes('PNDR')) {
-        setFeedbackMessage({ type: 'info', text: `Status: ${currentOrderInstance.id_status.name}. Menunggu konfirmasi...`, transactionId: orderOriginalRefId });
-        if (!pollingIntervalRef.current && isProcessingRef.current) { // Only set interval if not already running and processing
-          pollingIntervalRef.current = setInterval(() => checkOrderStatusAndSetupInterval(false), 30000);
+      } else if (statusCode.includes('PNDD') || statusCode.includes('PNDR')) { // Pending codes
+        setFeedbackMessage({ type: 'info', text: `Status: ${statusName}. Menunggu konfirmasi...`, transactionId: orderOriginalRefId });
+        if (!pollingIntervalRef.current && isProcessingRef.current) {
+          pollingIntervalRef.current = setInterval(() => checkOrderStatusAndSetupInterval(false), 30000); // Poll every 30 seconds
         }
+        // Ensure isProcessing remains true if pending
+        if (!isProcessing) setIsProcessing(true);
       } else { 
-        setFeedbackMessage({ type: 'info', text: `Status: ${currentOrderInstance.id_status.name}. Menunggu update...`, transactionId: orderOriginalRefId });
-         if (!pollingIntervalRef.current && isProcessingRef.current) {
+        // For other statuses, treat as info but might stop polling depending on business logic
+        // For now, assume other statuses are also "in progress" or require monitoring
+        setFeedbackMessage({ type: 'info', text: `Status: ${statusName}. Menunggu update...`, transactionId: orderOriginalRefId });
+         if (!pollingIntervalRef.current && isProcessingRef.current) { // If still processing and no interval, set one.
            pollingIntervalRef.current = setInterval(() => checkOrderStatusAndSetupInterval(false), 30000);
         }
+        if (!isProcessing) setIsProcessing(true);
       }
     } catch (error: any) {
+      // This catch block is for network errors or unexpected issues during fetch/JSON parsing
       let tempErrorMessage = "Terjadi masalah saat memeriksa status. Akan dicoba lagi.";
       if (typeof window !== 'undefined' && !navigator.onLine) {
          tempErrorMessage = "Koneksi internet terputus. Pemeriksaan status akan dilanjutkan.";
       }
       
       setFeedbackMessage(prev => {
+        // Don't overwrite a final success/error message with a temporary polling error
         if (prev && (prev.type === 'success' || prev.type === 'error')) return prev; 
         return { type: 'info', text: tempErrorMessage, transactionId: refId };
       });
       
-      if (!pollingIntervalRef.current && isProcessingRef.current) { // If an error occurs and we are still processing and no interval, set one
+      // If an error occurs, and we are still processing, and no interval is set, set one.
+      // This ensures polling continues after a temporary network glitch.
+      if (!pollingIntervalRef.current && isProcessingRef.current) {
         pollingIntervalRef.current = setInterval(() => checkOrderStatusAndSetupInterval(false), 30000);
       }
-      // Do not setIsProcessing(false) here for general catch, let interval retry
-      return;
+      // Do not setIsProcessing(false) here for general catch errors, let interval retry.
+      return; // Important to return to avoid setIsProcessing(false) if it's a recoverable error.
     }
-  }, [apiUrl, xApiToken, refId, clearPolling]);
+    
+    // Only set isProcessing to false here if it's not the initial direct fetch AND it wasn't handled by a pending state.
+    // The states SCCD, SCCR, FAILD, FAILR explicitly set isProcessing(false).
+    // If it's PNDD/PNDR or other unknown status, isProcessing might remain true for polling.
+    if (isInitialDirectFetch && !(statusCode.includes('PNDD') || statusCode.includes('PNDR'))) {
+        // If initial fetch and status is NOT pending, processing might be considered done
+        // unless it's an unknown status we decided to poll.
+        // This logic can be tricky; the primary control is `setIsProcessing(false)` in final states.
+    }
+
+  }, [apiUrl, xApiToken, refId, clearPolling]); // isProcessing and feedbackMessage removed to stabilize
 
 
   useEffect(() => {
     if (refId) {
-      setIsProcessing(true);
-      setFeedbackMessage(null);
+      setIsProcessing(true); // Set processing to true when refId is available and we start
+      setFeedbackMessage(null); // Clear previous messages
+      clearPolling(); // Clear any existing polling from a previous instance/navigation
       checkOrderStatusAndSetupInterval(true); // true indicates it's the initial direct fetch
     }
     return () => {
-      clearPolling();
+      clearPolling(); // Cleanup on unmount
     };
-  }, [refId, checkOrderStatusAndSetupInterval, clearPolling]); // checkOrderStatusAndSetupInterval & clearPolling are stable due to useCallback
+  }, [refId, checkOrderStatusAndSetupInterval, clearPolling]); 
 
   // Fallback details if context is missing, constructed from orderData
   const getFallbackGame = (): Game | null => {
     if (!orderData || !orderData.id_service) return null;
     return {
-      id: String(orderData.id_service.id_category),
+      id: String(orderData.id_service.id_category), // Using category as a fallback ID
       categoryId: orderData.id_service.id_category,
-      name: `Game (Kategori: ${orderData.id_service.id_category})`,
-      slug: String(orderData.id_service.id_category),
+      name: orderData.id_service.id_category ? `Game (Kategori: ${orderData.id_service.id_category})` : (orderData.id_service.name || "Nama Game Tidak Diketahui"),
+      slug: String(orderData.id_service.id_category), // Fallback slug
       imageUrl: orderData.id_service.img || "https://placehold.co/150x150.png",
       dataAiHint: "game icon",
-      description: `Detail untuk layanan ${orderData.id_service.name}`,
-      packages: [], 
-      accountIdFields: [] 
+      description: `Detail untuk layanan ${orderData.id_service.name || 'layanan ini'}`,
+      packages: [], // Cannot determine packages from order details alone
+      accountIdFields: [] // Cannot determine accountIdFields from order details
     };
   };
 
   const getFallbackPackage = (): DiamondPackage | null => {
     if (!orderData || !orderData.id_service) return null;
     return {
-      id: String(orderData.id_service.id), 
+      id: String(orderData.id_service.id), // Using service ID as package ID
       originalId: orderData.id_service.id,
-      name: orderData.id_service.name,
+      name: orderData.id_service.name || "Paket Tidak Diketahui",
       price: orderData.id_service.markup_price !== undefined ? orderData.id_service.markup_price : orderData.id_service.price,
       bonus: orderData.id_service.bonus,
-      imageUrl: orderData.id_service.img
+      imageUrl: orderData.id_service.img // Can be undefined, handled by DiamondPackageCard
     };
   };
   
   const getFallbackAccountDetails = (): ContextAccountDetails | null => {
     if (!orderData) return null;
     const details: ContextAccountDetails = { username: orderData.nickname || "N/A" };
-    if (orderData.user_id) details.userId = orderData.user_id;
-    if (orderData.zone_id) details.zoneId = orderData.zone_id;
-    // Attempt to reconstruct other accountIdFields if possible, though typically not present directly in Order
-    // This part remains basic as Order schema might not have all original form fields.
+    // Standardize keys for display if they come from orderData
+    if (orderData.user_id) details.userId = orderData.user_id; // Assuming 'userId' is a common key
+    if (orderData.zone_id) details.zoneId = orderData.zone_id; // Assuming 'zoneId' is a common key
+    
+    // Attempt to add any other relevant fields directly from orderData that aren't 'id_status', 'id_service', etc.
+    // This is a generic fallback, specific fields would depend on your Order structure and Game.accountIdFields
+    // For example, if your Order object had other fields like `server_id`, you might add them here.
+    // For now, keeping it simple to username, userId, zoneId.
     return details;
   };
 
@@ -193,8 +217,8 @@ const OrderDetailClient = ({ refId, apiUrl, xApiToken }: OrderDetailClientProps)
   const displayAccountDetails = contextAccountDetails || getFallbackAccountDetails();
 
 
-  if (!displayGame || !displayPackage || !displayAccountDetails) {
-    if (isProcessing || !orderData) { // Show loader if processing or orderData (for fallback) isn't loaded yet
+  if ((!displayGame || !displayPackage || !displayAccountDetails) && isProcessingRef.current) {
+      // If essential display details are missing AND we are still in a processing/loading state
       return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
           <Loader2 className="h-12 w-12 sm:h-16 sm:w-16 text-primary animate-spin mb-4" />
@@ -202,8 +226,10 @@ const OrderDetailClient = ({ refId, apiUrl, xApiToken }: OrderDetailClientProps)
           <p className="text-muted-foreground text-xs sm:text-sm">Harap tunggu sebentar.</p>
         </div>
       );
-    }
-    // If not processing and still no display details, implies an issue even with fallbacks
+  }
+  
+  if (!displayGame || !displayPackage || !displayAccountDetails) {
+    // If, after attempting fallbacks and processing is potentially done, details are still missing
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-4">
         <AlertTriangle className="h-12 w-12 sm:h-16 sm:w-16 text-destructive mb-4" />
@@ -211,18 +237,53 @@ const OrderDetailClient = ({ refId, apiUrl, xApiToken }: OrderDetailClientProps)
         <p className="text-muted-foreground mb-6 text-xs sm:text-sm md:text-base">
           Tidak dapat memuat semua detail yang diperlukan untuk transaksi ini.
         </p>
-        <button onClick={() => { resetPurchase(); if (typeof window !== 'undefined') window.location.href = '/'; }} className="text-xs sm:text-sm p-2 border rounded">
+        <button 
+          onClick={() => { 
+            resetPurchase(); 
+            if (typeof window !== 'undefined') window.location.href = '/'; 
+          }} 
+          className="text-xs sm:text-sm p-2 border rounded bg-primary text-primary-foreground hover:bg-primary/90"
+        >
           Kembali ke Beranda
         </button>
       </div>
     );
   }
   
+  // Ensure currentFeedback is always an object for FeedbackStateCard
+  const currentFeedback = feedbackMessage || 
+                          (isProcessingRef.current ? 
+                            { type: 'info', text: "Memeriksa status pembayaran...", transactionId: refId } :
+                            // If not processing and no specific message, it implies an issue or incomplete state if not success/error
+                            { type: 'info', text: "Tidak ada informasi status terbaru atau proses selesai.", transactionId: refId });
+
+
+  const handleRetryPayment = () => {
+    clearPolling();
+    if (orderData?.payment_url) {
+        if (typeof window.loadJokulCheckout === 'function') {
+            window.loadJokulCheckout(orderData.payment_url);
+            setIsProcessing(true);
+            setFeedbackMessage({ type: 'info', text: "Memeriksa status pembayaran setelah mencoba lagi...", transactionId: refId });
+            // Re-initiate polling for this refId after retry attempt
+            checkOrderStatusAndSetupInterval(true); // Start with an immediate check
+        } else {
+            setFeedbackMessage({ type: 'error', text: "Gagal memuat popup pembayaran. Fungsi tidak ditemukan.", transactionId: refId });
+        }
+    } else {
+        // Fallback: if no payment_url from orderData, redirect to /confirm, which should re-trigger /process-order
+        // This assumes /confirm can gracefully handle re-entry.
+        // router.push('/confirm'); // This might be too aggressive. Consider a message.
+        setFeedbackMessage({ type: 'error', text: "Tidak dapat mencoba ulang pembayaran, informasi pembayaran tidak ditemukan. Silakan coba dari awal.", transactionId: refId });
+    }
+  };
+  
   const handleGoBack = () => { 
     clearPolling();
+    // Determine if contextGame is available, otherwise try to use game slug from orderData if available
     const gameSlug = displayGame?.slug;
-    // Check if slug is just a category ID (fallback scenario)
-    const isFallbackSlug = gameSlug === String(displayGame?.categoryId);
+    const isFallbackSlug = gameSlug === String(displayGame?.categoryId); // Check if it's a fallback slug
+
     if (gameSlug && !isFallbackSlug) {
        if(typeof window !== 'undefined') window.location.href = `/games/${gameSlug}`;
     } else {
@@ -234,7 +295,7 @@ const OrderDetailClient = ({ refId, apiUrl, xApiToken }: OrderDetailClientProps)
     clearPolling();
     const gameSlug = displayGame?.slug;
     const isFallbackSlug = gameSlug === String(displayGame?.categoryId);
-    resetPurchase(); 
+    resetPurchase(); // Crucial: resets context and sessionStorage items via context
     if (gameSlug && !isFallbackSlug) {
       if(typeof window !== 'undefined') window.location.href = `/games/${gameSlug}`;
     } else if (typeof window !== 'undefined') {
@@ -244,17 +305,11 @@ const OrderDetailClient = ({ refId, apiUrl, xApiToken }: OrderDetailClientProps)
   
   const handleGoToHome = () => {
     clearPolling();
-    resetPurchase(); 
+    resetPurchase(); // Crucial
     if (typeof window !== 'undefined') {
       window.location.href = '/';
     }
   };
-  
-  const currentFeedback = feedbackMessage || 
-                          (isProcessing ? 
-                            { type: 'info', text: "Memeriksa status pembayaran...", transactionId: refId } :
-                            { type: 'info', text: "Tidak ada informasi status terbaru.", transactionId: refId });
-
 
   return (
     <FeedbackStateCard
@@ -262,24 +317,7 @@ const OrderDetailClient = ({ refId, apiUrl, xApiToken }: OrderDetailClientProps)
       selectedGame={displayGame}
       selectedPackage={displayPackage}
       accountDetails={displayAccountDetails}
-      onRetryPayment={() => {  
-          clearPolling(); 
-          if (orderData?.payment_url) { // Assuming Order might have payment_url for retry
-            if (typeof window.loadJokulCheckout === 'function') {
-                window.loadJokulCheckout(orderData.payment_url);
-                // Re-initiate polling for this refId after retry attempt
-                setIsProcessing(true);
-                setFeedbackMessage({ type: 'info', text: "Memeriksa status pembayaran setelah mencoba lagi...", transactionId: refId });
-                checkOrderStatusAndSetupInterval(true);
-            } else {
-                 setFeedbackMessage({ type: 'error', text: "Gagal memuat popup pembayaran. Fungsi tidak ditemukan.", transactionId: refId });
-            }
-          } else {
-            // If no payment_url, perhaps redirect to confirm or show error
-            setFeedbackMessage({ type: 'error', text: "Tidak ada informasi untuk mencoba ulang pembayaran.", transactionId: refId });
-            // router.push('/confirm'); // Or simply disable retry
-          }
-      }}
+      onRetryPayment={handleRetryPayment}
       onGoBack={handleGoBack}
       onShopAgain={handleShopAgain}
       onGoToHome={handleGoToHome}
@@ -288,5 +326,6 @@ const OrderDetailClient = ({ refId, apiUrl, xApiToken }: OrderDetailClientProps)
 };
 
 export default OrderDetailClient;
+    
 
     
